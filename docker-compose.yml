@@ -1,0 +1,150 @@
+# Veilix — base stack.
+#
+# Production shape. Publishes nothing except the edge proxy; everything else is
+# reachable only over Docker networks.
+#
+#   docker compose up -d                              core stack
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+#                                                     core + loopback debug ports
+#   docker compose --profile observability up -d      core + Prometheus/Grafana
+#
+# Required variables (see .env.example) fail the command rather than defaulting
+# to something insecure.
+
+name: veilix
+
+# ---------------------------------------------------------------------------
+# Networks — the isolation boundary described in ADR-0004.
+#
+#   backend is `internal: true`, so it has no gateway and no route off the host.
+#   Any service placed ONLY on backend/edge cannot reach the internet at all.
+#   SearXNG is the single service that also joins `egress`, because it is the
+#   only one that needs to talk to upstream search engines.
+# ---------------------------------------------------------------------------
+networks:
+  edge:
+    driver: bridge
+  backend:
+    driver: bridge
+    internal: true
+  egress:
+    driver: bridge
+
+# ---------------------------------------------------------------------------
+# Shared fragments
+# ---------------------------------------------------------------------------
+x-logging: &default-logging
+  driver: json-file
+  options:
+    # Bound log growth. Logs carry no query text or client IP
+    # (see docs/privacy.md §4), but unbounded files still fill disks.
+    max-size: "10m"
+    max-file: "3"
+
+x-hardening: &default-hardening
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+
+services:
+  # -------------------------------------------------------------------------
+  # Valkey — ephemeral cache and rate-limit counters.
+  #
+  # Persistence is switched off on purpose. `--save ""` disables RDB snapshots
+  # and `--appendonly no` disables the AOF, so cached result payloads and
+  # rate-limit keys exist in memory only and never touch disk. There is
+  # deliberately no volume mounted here: seizing the host filesystem yields no
+  # search data, because none was ever written. This is a privacy decision
+  # before it is a performance one (docs/privacy.md §2.2).
+  #
+  # LRU eviction means memory pressure degrades the cache hit rate rather than
+  # erroring, which is the correct failure mode for a cache.
+  # -------------------------------------------------------------------------
+  valkey:
+    image: valkey/valkey:8-alpine
+    container_name: veilix-valkey
+    restart: unless-stopped
+    # Start directly as the unprivileged valkey user (uid 999, gid 1000).
+    #
+    # The image entrypoint normally starts as root and uses setpriv to drop
+    # privileges, which needs CAP_SETUID/CAP_SETGID — capabilities that
+    # `cap_drop: ALL` removes, producing a crash loop of
+    # "setpriv: setresuid failed: Operation not permitted".
+    #
+    # Handing back those capabilities would work. Starting as the target user
+    # is strictly better: the process is never root at any point, so there is
+    # no privileged window to escape from and no capability to hand back.
+    user: "999:1000"
+    command:
+      - valkey-server
+      - --save
+      - ""
+      - --appendonly
+      - "no"
+      - --maxmemory
+      - 192mb
+      - --maxmemory-policy
+      - allkeys-lru
+    networks:
+      - backend
+    <<: *default-hardening
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  # -------------------------------------------------------------------------
+  # SearXNG — the meta-search core, run as an unmodified upstream image
+  # (ADR-0001). Configuration is mounted read-only; the image is never patched.
+  #
+  # Publishes no ports. Its JSON API is enabled for the Veilix API to consume
+  # and would be trivially abusable if exposed, which is exactly why it is
+  # reachable only from `backend` (ADR-0004). The dev override file adds a
+  # loopback-only port for debugging.
+  # -------------------------------------------------------------------------
+  searxng:
+    image: searxng/searxng:2026.8.29-d226b78bc
+    container_name: veilix-searxng
+    restart: unless-stopped
+    networks:
+      # Order matters for the default route: egress carries the gateway.
+      - backend
+      - egress
+    volumes:
+      - ./infra/searxng/settings.yml:/etc/searxng/settings.yml:ro
+    environment:
+      # Fails the command with a readable message if unset, rather than
+      # silently starting with upstream's "ultrasecretkey" placeholder.
+      # Quoted because the failure message contains a colon, which would
+      # otherwise terminate the YAML scalar.
+      SEARXNG_SECRET: "${SEARXNG_SECRET:?required — generate with openssl rand -hex 32}"
+      # Instance ROOT, with a trailing slash. A path suffix here makes SearXNG
+      # believe it is mounted under that path and 308-redirect every request.
+      SEARXNG_BASE_URL: "${VEILIX_PUBLIC_URL:-http://localhost:8088}/"
+      SEARXNG_BIND_ADDRESS: "0.0.0.0"
+      SEARXNG_PORT: "8080"
+      # Granian, not uWSGI — verified against this image tag.
+      GRANIAN_WORKERS: "1"
+      GRANIAN_BLOCKING_THREADS: "4"
+    <<: *default-hardening
+    logging: *default-logging
+    healthcheck:
+      # The image ships wget but not curl.
+      test: ["CMD", "wget", "-q", "--spider", "-T", "5", "http://127.0.0.1:8080/healthz"]
+      interval: 15s
+      timeout: 6s
+      retries: 5
+      # Engine initialisation on a cold start takes a while.
+      start_period: 45s
+    deploy:
+      resources:
+        limits:
+          memory: 512M

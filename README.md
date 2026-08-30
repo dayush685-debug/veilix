@@ -1,4 +1,4 @@
-# PrivSearch
+# Veilix
 
 A privacy-first, self-hostable meta-search platform built around
 [SearXNG](https://github.com/searxng/searxng).
@@ -6,10 +6,10 @@ A privacy-first, self-hostable meta-search platform built around
 It aggregates results from many search engines without accounts, without cookies, without
 search history, and without building a profile of the person asking.
 
-> **Build status: Phase 1 of 10 (architecture) complete.** The design is documented and
-> the repository is scaffolded; application code lands from Phase 2 onward. This README
-> is filled out as each phase completes, and no capability is described here before it
-> exists.
+> **Build status: Phase 2 of 10 complete.** SearXNG is configured and running, network
+> isolation is verified by an executable test, and `scripts/verify-stack.sh` passes 13
+> checks. The API and frontend land in Phases 3 and 4. This README is filled out as each
+> phase completes, and no capability is described here before it exists.
 
 ## Why this exists
 
@@ -61,6 +61,7 @@ Full detail in **[docs/architecture.md](docs/architecture.md)**.
 | [docs/architecture.md](docs/architecture.md) | Topology, request flow, technology decisions, verified SearXNG facts |
 | [docs/privacy.md](docs/privacy.md) | Complete data inventory, retention, and what the operator can still observe |
 | [docs/adr/](docs/adr/) | Architecture decision records, including what was rejected and why |
+| [docs/security-findings.md](docs/security-findings.md) | Running register of security findings, open and fixed |
 
 ### Decision records
 
@@ -85,5 +86,5 @@ Compose · Prometheus · Grafana · OpenTelemetry · pytest · Playwright · Git
 
 ## Licence
 
-To be selected before publication. Note that SearXNG is AGPL-3.0-or-later; PrivSearch
+To be selected before publication. Note that SearXNG is AGPL-3.0-or-later; Veilix
 runs it as an unmodified upstream container image and does not link to or modify its code.

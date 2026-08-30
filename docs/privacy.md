@@ -6,7 +6,7 @@
 
 ## 1. The commitment
 
-PrivSearch does not profile its users. There are no accounts, no identity cookies, no
+Veilix does not profile its users. There are no accounts, no identity cookies, no
 cross-request user identifier, no search history, no advertising, and no third-party
 analytics. Those are not settings that ship disabled — they are capabilities the system
 does not contain.
@@ -111,11 +111,34 @@ IP address and a referrer, for content the user never chose to load from them.
 
 Two mitigations are enabled:
 
-- **Image proxying** (`image_proxy: true`): thumbnails are fetched by our server and
-  relayed, so third-party image hosts see the server, not the user. The cost is our
-  bandwidth and CPU, which is accepted.
+- **Image proxying**: thumbnails are fetched by our server and relayed, so third-party
+  image hosts see the server, not the user. The cost is our bandwidth and CPU, which is
+  accepted.
 - **`Referrer-Policy: no-referrer`**: clicking through to a result does not tell the
-  destination site that PrivSearch sent you.
+  destination site that Veilix sent you.
+
+**How image proxying actually works here, because the obvious setting is not enough.**
+Setting `image_proxy: true` in SearXNG rewrites image URLs only when SearXNG renders its
+own HTML templates. Veilix consumes the **JSON API**, and that output was measured to
+contain raw third-party URLs — 0 of 264 image results came back proxied. Relying on the
+setting alone would have left every image request going straight from the user's browser
+to `pinimg.com`, `gstatic.com` and the rest, while the configuration file claimed
+otherwise.
+
+The Veilix API therefore performs the rewrite itself. SearXNG signs proxy URLs as
+`HMAC-SHA256(secret_key, url)`, and the API holds the same secret, so it re-signs each
+`img_src` into a proxy URL before the result ever reaches the browser. Verified working:
+a signed request returns the image bytes with `HTTP 200`, and a tampered signature is
+rejected with `HTTP 400`.
+
+**A residual risk this introduces, stated plainly.** The image proxy fetches whatever
+signed URL it is given. A hostile page that manages to rank in results could carry an
+`img_src` pointing at an internal address, and our API would sign it. Upstream limits the
+damage — responses must have an `image/` content type and are capped at 5 MB, so
+exfiltration is constrained — but blind server-side request forgery remains possible.
+Mitigation is scheduled for Phase 5 and tracked in
+[`docs/security-findings.md`](./security-findings.md); it is recorded here rather than
+left to be discovered later.
 
 Once a user clicks a result, they are on someone else's site under someone else's privacy
 policy. Nothing in this system extends past that boundary, and it does not pretend to.

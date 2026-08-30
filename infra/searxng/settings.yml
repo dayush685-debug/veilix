@@ -1,0 +1,176 @@
+# Veilix — SearXNG instance configuration
+#
+# Written against searxng/searxng:2026.8.29-d226b78bc. Verified facts:
+#   - the WSGI server is Granian, configured via GRANIAN_* env vars (not uWSGI)
+#   - the datastore key is `valkey:` (upstream migrated away from `redis:`)
+#   - `formats` defaults to [html]; JSON must be enabled explicitly
+#   - environment variables OVERRIDE values set here
+#     (searx/settings_defaults.py: SettingsValue(..., environ_name=...))
+#
+# `use_default_settings: true` means this file is a diff against upstream defaults.
+# We override deliberately and leave the other ~200 settings to upstream, so that
+# upgrades bring improvements instead of silently colliding with a stale full copy.
+
+use_default_settings: true
+
+general:
+  debug: false
+  instance_name: "Veilix"
+  # Surface our own policy documents rather than upstream placeholders.
+  privacypolicy_url: "/privacy"
+  contact_url: false
+  donation_url: false
+  # Per-engine aggregate timing and error counters, exposed at /stats.
+  # These are engine-level aggregates with no query text and no client identity,
+  # so they are operational telemetry rather than surveillance
+  # (see docs/privacy.md §8). The admin dashboard consumes them.
+  enable_metrics: true
+
+server:
+  # Overridden by SEARXNG_BASE_URL in compose.
+  base_url: false
+  port: 8080
+  # Must be reachable from the api container on the internal network.
+  # Not a public exposure: this service publishes no host ports (ADR-0004).
+  bind_address: "0.0.0.0"
+
+  # REQUIRED, injected via SEARXNG_SECRET. Upstream ships "ultrasecretkey";
+  # shipping that value is a real vulnerability, not a formality.
+  secret_key: "OVERRIDDEN_BY_SEARXNG_SECRET_ENV"
+
+  # Deliberately disabled — see ADR-0004.
+  # SearXNG's bot detection keys on client IP. Behind this architecture every
+  # request arrives from one source (the api container), so the limiter would
+  # treat the entire user base as a single client: it would either throttle
+  # everyone at once or, with that IP passlisted, do nothing at all. Neither is
+  # rate limiting. Enforcement happens at the edge, where real client identity
+  # exists.
+  #
+  # SAFE ONLY WHILE THIS SERVICE PUBLISHES NO PORTS. If SearXNG is ever exposed,
+  # this must flip to true in the same commit, or it becomes an open,
+  # unauthenticated, abusable JSON search API.
+  limiter: false
+
+  # Public-instance mode tightens bot detection further; irrelevant while
+  # unpublished, and it would fight the limiter decision above.
+  public_instance: false
+
+  # Fetch result thumbnails server-side so third-party image hosts
+  # (gstatic.com, cdn.jsdelivr.net, ...) never see a user's IP address.
+  # Costs our bandwidth and CPU; accepted. See docs/privacy.md §6.
+  image_proxy: true
+
+  # Keep-alive between Caddy, the api container and here.
+  http_protocol_version: "1.1"
+
+  # GET keeps searches shareable and bookmarkable, and the browser history
+  # entry stays on the user's own machine either way.
+  method: "GET"
+
+  default_http_headers:
+    X-Content-Type-Options: nosniff
+    X-Download-Options: noopen
+    X-Robots-Tag: noindex, nofollow
+    Referrer-Policy: no-referrer
+
+# Cache and coordination for SearXNG itself. Shares the Valkey instance with the
+# API, on a separate logical database so key spaces cannot collide.
+valkey:
+  url: valkey://valkey:6379/1
+
+ui:
+  static_use_hash: true
+  default_locale: "en"
+  # Keeping the query out of the page title avoids leaking it into
+  # window titles, screenshots, and screen-sharing sessions.
+  query_in_title: false
+  infinite_scroll: false
+  center_alignment: true
+  default_theme: simple
+  theme_args:
+    simple_style: auto
+  search_on_category_select: true
+  hotkeys: default
+
+search:
+  # Moderate by default. Off is a deliberate user choice, not the default a
+  # first-time visitor is handed.
+  safe_search: 1
+
+  # DuckDuckGo's suggestion endpoint is queried server-side, so the user's
+  # browser never contacts it and DDG sees our server rather than the user.
+  autocomplete: "duckduckgo"
+  autocomplete_min: 2
+
+  # Favicon resolvers issue a per-result request to a third party. Off.
+  favicon_resolver: ""
+
+  default_lang: "auto"
+  max_page: 10
+
+  # JSON is what the Veilix API consumes. Upstream disables it by default
+  # because a public JSON endpoint is trivially abusable — which is precisely
+  # why this service is never published (ADR-0004).
+  formats:
+    - html
+    - json
+
+  # Per-engine failure back-off. This is SearXNG's own circuit breaking, and it
+  # is why the orchestrator does not implement per-engine breakers (ADR-0006).
+  ban_time_on_fail: 5
+  max_ban_time_on_fail: 120
+  suspended_times:
+    SearxEngineAccessDenied: 180
+    SearxEngineCaptcha: 3600
+    SearxEngineTooManyRequests: 180
+    cf_SearxEngineCaptcha: 1296000
+    cf_SearxEngineAccessDenied: 86400
+
+outgoing:
+  # Upstream default is 3.0s. Raised slightly: slow-but-useful engines
+  # (arxiv, semantic scholar) get a chance to land, and the API's own
+  # VEILIX_SEARCH_TIMEOUT_S sits above this as the outer bound.
+  request_timeout: 5.0
+  max_request_timeout: 10.0
+
+  # Empty on purpose. Upstream suggests an admin email here; that would
+  # attach an identifiable operator string to every upstream request.
+  useragent_suffix: ""
+
+  pool_connections: 100
+  pool_maxsize: 20
+  enable_http2: true
+
+engines:
+  # ---------------------------------------------------------------------
+  # Independent indexes, enabled to offset the CAPTCHA problem.
+  #
+  # Measured on a clean instance: brave, duckduckgo and startpage were all
+  # suspended on the very first query, because upstreams CAPTCHA-wall
+  # self-hosted instances. These three run their own crawlers, are friendlier
+  # to self-hosters, and keep general search useful when the big engines are
+  # blocked. Result diversity here is a reliability measure, not a feature.
+  # ---------------------------------------------------------------------
+  - name: mojeek
+    disabled: false
+  - name: qwant
+    disabled: false
+  - name: mwmbl
+    disabled: false
+
+  # ---------------------------------------------------------------------
+  # Torrent engines, disabled.
+  #
+  # Upstream enables these in the `files` category. They index predominantly
+  # infringing content, and an operator deploying Veilix should not inherit
+  # that exposure from a default they never chose. Anyone who wants them can
+  # re-enable them knowingly; that is the right way round.
+  # ---------------------------------------------------------------------
+  - name: bt4g
+    disabled: true
+  - name: kickass
+    disabled: true
+  - name: piratebay
+    disabled: true
+  - name: solidtorrents
+    disabled: true

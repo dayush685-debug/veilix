@@ -6,7 +6,7 @@
 
 ## 1. What this system is
 
-PrivSearch is a **privacy-first meta-search platform**. It does not crawl or index the
+Veilix is a **privacy-first meta-search platform**. It does not crawl or index the
 web. It forwards a query to many upstream search engines through SearXNG, merges the
 results, and returns them without ever building a profile of the person asking.
 
@@ -139,7 +139,7 @@ Clean architecture with dependencies pointing inward. The domain layer knows not
 about SearXNG, HTTP, or Valkey.
 
 ```
-apps/api/src/privsearch/
+apps/api/src/veilix/
 ├── main.py               app factory + lifespan only, no business logic
 ├── core/
 │   ├── config.py         pydantic-settings; fails fast on invalid config

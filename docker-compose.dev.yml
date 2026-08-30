@@ -1,0 +1,22 @@
+# Veilix — development override.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+#
+# Publishes internal services on the LOOPBACK INTERFACE ONLY so they can be
+# inspected during development. The `127.0.0.1:` prefix is load-bearing: without
+# it Docker binds 0.0.0.0 and, on many hosts, punches through the firewall —
+# which would expose an unauthenticated JSON search API to the local network and
+# defeat ADR-0004.
+#
+# NEVER use this file on a public host.
+
+services:
+  searxng:
+    ports:
+      # Host 18080 avoids 8080, commonly taken by other local projects.
+      - "127.0.0.1:18080:8080"
+
+  valkey:
+    ports:
+      # Host 16379 avoids 6379, which is frequently already bound.
+      - "127.0.0.1:16379:6379"
