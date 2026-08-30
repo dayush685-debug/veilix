@@ -1,0 +1,42 @@
+# Trivy exceptions.
+#
+# Every entry here is a finding we have decided to accept, with a reason and an
+# expiry. An exception without an expiry is not an exception, it is a permanent
+# blind spot - so each one is dated, and Trivy re-reports it after that date.
+#
+# ---------------------------------------------------------------------------
+# Go modules compiled into the Caddy binary (target: usr/bin/caddy)
+# ---------------------------------------------------------------------------
+#
+# These are not our dependencies and cannot be patched from here: they are
+# statically linked into the upstream Caddy release binary.
+#
+# Verified rather than assumed. The newest published image (caddy:2-alpine,
+# v2.11.4) is built against Go 1.26.3, and every one of these needs 1.26.4 or
+# later. `apk --no-cache upgrade` in the Dockerfile fixes the Alpine packages -
+# it did, taking the count from 21 to 14 - but cannot touch a compiled binary.
+#
+# The escape hatch, if these become material: build Caddy from source with
+# xcaddy on a newer Go toolchain. That trades a maintained third-party release
+# for a build we own, which is a real ongoing cost and not currently justified
+# for a proxy that terminates TLS and serves static files.
+#
+# Exposure is worth stating: Caddy is the only internet-facing container here.
+# That argues for reviewing this on a schedule rather than setting and
+# forgetting it.
+#
+# REVIEW BY 2026-11-30 - re-scan and delete any entry upstream has fixed.
+
+CVE-2026-27145 exp:2026-11-30
+CVE-2026-33818 exp:2026-11-30
+CVE-2026-39821 exp:2026-11-30
+CVE-2026-39822 exp:2026-11-30
+CVE-2026-42504 exp:2026-11-30
+CVE-2026-46600 exp:2026-11-30
+CVE-2026-56852 exp:2026-11-30
+CVE-2026-56853 exp:2026-11-30
+CVE-2026-56858 exp:2026-11-30
+CVE-2026-56859 exp:2026-11-30
+CVE-2026-56860 exp:2026-11-30
+CVE-2026-56862 exp:2026-11-30
+GHSA-hrxh-6v49-42gf exp:2026-11-30

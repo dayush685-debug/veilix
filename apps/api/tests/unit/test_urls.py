@@ -86,15 +86,56 @@ class TestSafeToProxy:
     def test_rejects_non_web_schemes(self, url: str) -> None:
         assert is_safe_to_proxy(url) is False
 
-    def test_hostname_resolving_internally_is_not_caught(self) -> None:
-        """Documents the known limit of this check rather than pretending it is complete.
+    @pytest.mark.parametrize(
+        ("host", "why"),
+        [
+            ("http://valkey:6379/x.jpg", "docker service name for our cache"),
+            ("http://api:8000/x.jpg", "docker service name for our own API"),
+            ("http://searxng:8080/x.jpg", "docker service name for the search backend"),
+            ("http://localhost/x.jpg", "loopback by name"),
+            ("http://db/x.jpg", "any single-label host"),
+        ],
+    )
+    def test_rejects_single_label_hostnames(self, host: str, why: str) -> None:
+        """Blocking private IP literals is not enough inside Docker.
 
-        A hostname is accepted because the API container has no external DNS to
-        resolve it with — the same isolation that contains an attacker (ADR-0004)
-        also prevents this function from checking where a name points. Closing
-        the gap needs an egress policy on the fetching side; tracked as SF-003.
+        The embedded DNS server resolves service names, so `http://valkey:6379/`
+        is a *hostname* and sails past an IP-literal check. Probing from inside
+        the container confirmed valkey, the API, and an unrelated project's
+        database were all reachable from the container that does the fetching.
 
-        This test exists so that if someone later adds resolution, they see a
-        deliberate decision here rather than assuming an oversight.
+        Every routable public name has a dot; these do not.
         """
-        assert is_safe_to_proxy("https://internal.corp.example/secret.jpg") is True
+        assert is_safe_to_proxy(host) is False, f"should reject {why}"
+
+    @pytest.mark.parametrize(
+        "host",
+        [
+            "http://db.internal/x.jpg",
+            "http://printer.local/x.jpg",
+            "http://server.lan/x.jpg",
+            "http://thing.home.arpa/x.jpg",
+        ],
+    )
+    def test_rejects_known_internal_suffixes(self, host: str) -> None:
+        assert is_safe_to_proxy(host) is False
+
+    def test_still_accepts_ordinary_public_hostnames(self) -> None:
+        assert is_safe_to_proxy("https://images.example.com/a.jpg") is True
+        assert is_safe_to_proxy("https://cdn.jsdelivr.net/x.svg") is True
+
+    def test_public_name_pointing_at_a_private_address_is_not_caught(self) -> None:
+        """The remaining limit, stated rather than implied.
+
+        A public-looking name whose DNS record points somewhere private still
+        passes. Resolving to check is impossible here: the API container has no
+        external DNS by design (ADR-0004), so the same isolation that contains
+        an attacker also prevents this function from looking the name up.
+        Closing it needs an egress policy on the fetching side — SF-003.
+
+        This test exists so that anyone who later adds resolution finds a
+        deliberate decision rather than assuming an oversight.
+        """
+        # A real, routable-looking name — not one under a reserved TLD, which
+        # the suffix list would catch for a different reason.
+        assert is_safe_to_proxy("https://intranet.mycompany.com/secret.jpg") is True

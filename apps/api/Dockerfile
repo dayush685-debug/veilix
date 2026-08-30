@@ -61,6 +61,17 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/opt/venv/bin:$PATH"
 
+# Apply the base image's outstanding security updates.
+#
+# Not cosmetic: a Trivy scan of this image reported 55 HIGH/CRITICAL OS
+# findings, most of them util-linux issues with fixes already published. A
+# pinned base tag is a point-in-time snapshot, so pinning it and never
+# upgrading means shipping whatever was current when that tag was cut.
+RUN apt-get update \
+    && apt-get upgrade -y --no-install-recommends \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
 # Fixed high uid/gid rather than a name. Numeric ids are what the kernel
 # enforces, they survive a base-image change that renumbers accounts, and they
 # let compose assert `user:` without depending on the image's /etc/passwd.
@@ -68,6 +79,22 @@ RUN groupadd --gid 10001 veilix \
     && useradd --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin veilix
 
 COPY --from=builder --chown=root:root /opt/venv /opt/venv
+
+# Remove pip and setuptools from the runtime image.
+#
+# Both Python vulnerabilities Trivy reported (msgpack via pip's vendored
+# cachecontrol, and setuptools itself) came from the packaging tooling rather
+# than from anything this application imports. Nothing installs packages at
+# runtime, so the tooling is pure attack surface: without it, an attacker with
+# code execution cannot `pip install` a payload, and the image stops inheriting
+# CVEs from a dependency tree it never uses.
+RUN find /opt/venv /usr/local/lib/python3.13 -maxdepth 4 -type d \
+        \( -name pip -o -name "pip-*" \
+           -o -name setuptools -o -name "setuptools-*" \
+           -o -name pkg_resources -o -name _distutils_hack \) \
+        -exec rm -rf {} + 2>/dev/null || true \
+    && rm -f /opt/venv/bin/pip* /usr/local/bin/pip* \
+    && python -c "import veilix; print('runtime import OK:', veilix.__version__)"
 
 WORKDIR /app
 USER 10001:10001

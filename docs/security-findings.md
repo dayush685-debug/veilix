@@ -13,7 +13,7 @@ Status values: **OPEN** · **MITIGATED** · **ACCEPTED** (documented residual ri
 
 - **Found**: Phase 0, image inspection
 - **Severity**: Medium
-- **Status**: OPEN — scheduled for Phase 5
+- **Status**: FIXED in Phase 5
 
 `searxng/searxng:2026.8.29-d226b78bc` runs Granian as uid 0. The entrypoint `chown`s
 config to the `searxng` user (uid 977) and then `exec`s the server directly, with no
@@ -23,10 +23,22 @@ returning `uid=0(root)`.
 Root inside a container is not root on the host, but it removes a layer: combined with a
 kernel or runtime vulnerability it materially shortens the path to escape.
 
-**Planned fix**: run the service with `user: "977:977"` and verify the entrypoint's
-`chown` step tolerates it. Note that ADR-0004's network isolation limits blast radius but
-does not substitute for this — network policy constrains a compromised process, not a
-compromised kernel.
+**Fix applied**: `user: "977:977"` in compose. This is safe because the entrypoint guards
+its `chown` with an `id -u = 0` test, so as a non-root user that step is skipped with a
+warning rather than failing. Verified: `docker exec veilix-searxng id` returns
+`uid=977(searxng)`, the container is healthy, and search returns results.
+
+Hardened further in the same pass: `read_only: true` with `/tmp` and
+`/var/cache/searxng` as `noexec,nosuid` tmpfs mounts. SearXNG writes SQLite caches to
+both, so they are now memory-only and never reach disk.
+
+**A privacy question that had to be answered first**: those SQLite files might have
+contained query text, which would contradict `docs/privacy.md`. Checked rather than
+assumed — a canary query was run and both databases were searched for its text. They hold
+engine metadata and tracker patterns, no queries. The tmpfs is belt-and-braces on top.
+
+Note that ADR-0004's network isolation limits blast radius but does not substitute for
+this — network policy constrains a compromised process, not a compromised kernel.
 
 ---
 
@@ -104,7 +116,7 @@ protection. A reader deserves both halves.
 
 - **Found**: Phase 1, design
 - **Severity**: High **if** the precondition is ever broken
-- **Status**: ACCEPTED with a guard rail — test to be added in Phase 5
+- **Status**: MITIGATED — automated guard rails added in Phase 5
 
 SearXNG runs with its bot-detection limiter disabled and its JSON API enabled, which is
 correct for the current topology and reasoned through in ADR-0004. If SearXNG is ever
@@ -113,9 +125,16 @@ abusable JSON search API.
 
 This is a procedural dependency, and procedure is a weak control on its own.
 
-**Guard rail (Phase 5)**: an automated test asserting that the SearXNG service declares
-no published ports in `docker-compose.yml`, so breaking the precondition fails CI rather
-than shipping.
+**Guard rails added (Phase 5)**, two of them, because one was not enough:
+
+1. `verify-stack.sh` asserts the production compose topology publishes host ports for the
+   edge service *only*. An earlier version simply counted all published ports and started
+   failing the moment Caddy legitimately published one — a check too blunt to survive
+   contact with the architecture it guards.
+2. It separately fetches `/search`, `/config`, and `/stats` **through the edge** and
+   inspects the response *body*. Status alone gives a false pass here, because the SPA
+   fallback also answers 200; only the body distinguishes the app shell from leaked
+   SearXNG output.
 
 **Note on the dev override**: `docker-compose.dev.yml` does publish SearXNG, deliberately
 bound to `127.0.0.1` so it is not reachable from the local network. The loopback prefix is
@@ -225,3 +244,72 @@ carries only protocol, method, duration, size, and status.
 but by reading the output it produced. `scripts/verify-stack.sh` now greps recent access
 logs for anything shaped like an IP address, so a future field rename fails a check
 instead of silently reinstating the leak.
+
+
+---
+
+## SF-009 — Unpatchable Go CVEs in the upstream Caddy binary
+
+- **Found**: Phase 5, Trivy scan
+- **Severity**: Medium
+- **Status**: ACCEPTED, expiring 2026-11-30
+
+Fourteen HIGH/CRITICAL findings sit in Go modules statically linked into
+`usr/bin/caddy` — `golang.org/x/net`, `golang.org/x/text`, `google.golang.org/grpc`, and
+the Go standard library. They are not our dependencies and cannot be patched from here.
+
+**Verified rather than assumed**: pulled the newest published image (`caddy:2-alpine`,
+v2.11.4) and re-scanned. It is built against Go 1.26.3; every finding needs 1.26.4 or
+later. `apk --no-cache upgrade` in the Dockerfile fixed the Alpine packages — taking the
+count from 21 to 14 — but cannot touch a compiled binary.
+
+**The escape hatch, if these become material**: build Caddy from source with xcaddy on a
+newer Go toolchain. That trades a maintained upstream release for a build we own, which
+is a real ongoing cost and not currently justified for a proxy that terminates TLS and
+serves static files.
+
+**Why this is dated rather than simply ignored**: Caddy is the only internet-facing
+container here. An exception without an expiry is a permanent blind spot, so
+`.trivyignore` carries `exp:2026-11-30` on every entry and Trivy will re-report them
+after that date.
+
+---
+
+## SF-010 — Internal Docker hostnames bypassed the image-proxy SSRF guard
+
+- **Found**: Phase 5, probing reachability from inside the container
+- **Severity**: Medium
+- **Status**: FIXED in Phase 5
+
+`is_safe_to_proxy` rejected private IP *literals* but accepted any hostname. Inside
+Docker that is not enough: the embedded DNS server resolves service names, so
+`http://valkey:6379/` and `http://api:8000/` are hostnames and sailed straight through.
+The API would have signed them, and SearXNG — which has egress and sits on the same
+network — would have fetched them.
+
+Measured rather than theorised. Probing from inside `veilix-searxng`:
+
+```
+REACHABLE  researchos-postgres, unrelated project (172.20.0.2:5432)
+REACHABLE  veilix valkey (valkey:6379)
+REACHABLE  veilix api (api:8000)
+blocked    cloud metadata (169.254.169.254:80)
+REACHABLE  public internet (example.com:443)
+```
+
+An unrelated project's database on the same Docker host was reachable from the container
+that performs proxy fetches.
+
+**Fix**: reject **single-label hostnames**. Every routable public name has at least one
+dot; internal Docker service names, `localhost`, and short intranet names do not. That one
+rule removes the entire container-DNS attack surface. Known internal suffixes
+(`.local`, `.internal`, `.lan`, `.home.arpa`, …) are rejected too, for names like
+`db.internal` that do carry a dot.
+
+Covered by parametrised tests over `valkey`, `api`, `searxng`, `localhost`, `db`, and each
+internal suffix, plus a test asserting ordinary public hostnames still work.
+
+**Residual**: a public-looking name whose DNS record points at a private address still
+passes, and cannot be caught here — the API container has no external DNS by design
+(ADR-0004), so the isolation that contains an attacker also prevents this check from
+resolving anything. Rolled into SF-003.

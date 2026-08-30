@@ -6,12 +6,12 @@ A privacy-first, self-hostable meta-search platform built around
 It aggregates results from many search engines without accounts, without cookies, without
 search history, and without building a profile of the person asking.
 
-> **Build status: Phase 4 of 10 complete.** The full stack runs as four hardened
-> containers behind Caddy. 168 tests pass (151 backend, 17 frontend), mypy runs strict
-> and clean, ESLint is clean with type-aware rules, and `scripts/verify-stack.sh` asserts
-> **31 architectural and security claims** against the running stack. This README is
-> filled out as each phase completes, and no capability is described here before it
-> exists.
+> **Build status: Phase 5 of 10 complete.** The full stack runs as four containers that
+> are all non-root, read-only-rootfs, `cap_drop: ALL`, and `no-new-privileges`. 178 tests
+> pass (161 backend, 17 frontend), `scripts/verify-stack.sh` asserts **32 architectural
+> and security claims** against the running stack, and `scripts/security-scan.sh` reports
+> zero fixable HIGH/CRITICAL vulnerabilities across both images. This README is filled out
+> as each phase completes, and no capability is described here before it exists.
 
 ## Why this exists
 
@@ -64,6 +64,7 @@ Full detail in **[docs/architecture.md](docs/architecture.md)**.
 | [docs/architecture.md](docs/architecture.md) | Topology, request flow, technology decisions, verified SearXNG facts |
 | [docs/privacy.md](docs/privacy.md) | Complete data inventory, retention, and what the operator can still observe |
 | [docs/api.md](docs/api.md) | API reference, and the two behaviours that will surprise a client |
+| [docs/threat-model.md](docs/threat-model.md) | Actors, trust boundaries, controls, and residual risk |
 | [docs/security-findings.md](docs/security-findings.md) | Every security finding, open and fixed, with evidence |
 | [docs/adr/](docs/adr/) | Architecture decision records, including what was rejected and why |
 | [docs/security-findings.md](docs/security-findings.md) | Running register of security findings, open and fixed |

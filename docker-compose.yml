@@ -76,6 +76,10 @@ services:
     # is strictly better: the process is never root at any point, so there is
     # no privileged window to escape from and no capability to hand back.
     user: "999:1000"
+    # Nothing is persisted (see the command below), so the process needs no
+    # writable path at all. Verified: it starts and serves with the whole root
+    # filesystem read-only.
+    read_only: true
     command:
       - valkey-server
       - --save
@@ -114,10 +118,33 @@ services:
     image: searxng/searxng:2026.8.29-d226b78bc
     container_name: veilix-searxng
     restart: unless-stopped
+    # Run as the image's own searxng account (uid/gid 977) instead of root.
+    #
+    # Upstream ships this image running Granian as uid 0 and never drops
+    # privileges (SF-001). Its entrypoint guards the config chown with an
+    # `id -u = 0` check, so as a non-root user that step is skipped with a
+    # warning rather than failing - which is what makes this override safe.
+    #
+    # Root in a container is not root on the host, but it removes a layer:
+    # combined with a kernel or runtime bug it shortens the path to escape.
+    user: "977:977"
     networks:
       # Order matters for the default route: egress carries the gateway.
       - backend
       - egress
+    read_only: true
+    tmpfs:
+      # SearXNG writes SQLite caches to /tmp and /var/cache/searxng. Both are
+      # tmpfs rather than volumes, so the contents live in memory and never
+      # reach disk.
+      #
+      # Checked rather than assumed: a canary query was run and both databases
+      # were searched for its text. They hold engine metadata and tracker
+      # patterns, no query text. The tmpfs is belt-and-braces on top of that.
+      #
+      # noexec/nosuid so a write primitive cannot stage and run a binary.
+      - /tmp:rw,noexec,nosuid,size=64m
+      - /var/cache/searxng:rw,noexec,nosuid,size=64m
     volumes:
       - ./infra/searxng/settings.yml:/etc/searxng/settings.yml:ro
     environment:
@@ -256,6 +283,9 @@ services:
     image: veilix-web:local
     container_name: veilix-caddy
     restart: unless-stopped
+    # Matches the USER baked into the image. Stated here too so the intent is
+    # visible in the topology rather than only in a Dockerfile.
+    user: "10002:10002"
     depends_on:
       api:
         condition: service_healthy
@@ -274,6 +304,9 @@ services:
       # interpolate and reject.
       VEILIX_SITE_ADDRESS: "${VEILIX_SITE_ADDRESS:-:8080}"
       VEILIX_ACME_EMAIL: "${VEILIX_ACME_EMAIL:-}"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
     volumes:
       # Certificates and ACME account keys. Named volumes, not bind mounts:
       # this tree is inside a OneDrive sync root, and syncing private keys to

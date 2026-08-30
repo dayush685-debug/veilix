@@ -26,6 +26,14 @@ RUN npm run build
 # ---------------------------------------------------------------------------
 FROM caddy:2-alpine AS runtime
 
+# Apply the base image's outstanding package updates.
+#
+# Measured, not assumed: a Trivy scan of this image reported 21 HIGH/CRITICAL
+# findings, all with fixes already published upstream - openssl, curl, c-ares.
+# A pinned tag is a point-in-time snapshot, so building on it without an
+# upgrade ships whatever was current when that tag was cut.
+RUN apk --no-cache upgrade
+
 # Strip the file capabilities from the Caddy binary.
 #
 # The image ships /usr/bin/caddy with cap_net_bind_service so it can bind port
@@ -41,6 +49,21 @@ RUN apk add --no-cache libcap     && setcap -r /usr/bin/caddy     && apk del lib
 
 COPY infra/caddy/Caddyfile /etc/caddy/Caddyfile
 COPY --from=builder /build/dist /srv
+
+# Run as an unprivileged account.
+#
+# The official image runs Caddy as root. Nothing here needs it: the binary's
+# port-binding capability was stripped above, it listens on 8080, and Docker
+# publishes the privileged port to it.
+#
+# /data holds TLS private keys and the ACME account key, so it must be
+# writable by this user and readable by nobody else. Creating the directories
+# here with the right ownership matters because Docker initialises a fresh
+# named volume from the image content it shadows - do it after this point and
+# the volume comes up owned by root and Caddy cannot write its certificates.
+RUN addgroup -g 10002 -S caddy 2>/dev/null || true     && adduser -u 10002 -S -G caddy caddy 2>/dev/null || true     && mkdir -p /data/caddy /config/caddy     && chown -R 10002:10002 /data /config     && chmod 700 /data
+
+USER 10002:10002
 
 # Node, npm, and the entire source tree stay in the builder. The runtime image
 # holds static files and one binary.

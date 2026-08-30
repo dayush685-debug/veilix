@@ -80,11 +80,13 @@ def is_safe_to_proxy(url: str) -> bool:
     if not host:
         return False
 
+    host = host.lower().rstrip(".")
+
     try:
         address = ipaddress.ip_address(host)
     except ValueError:
-        # A hostname, not a literal address. See the caveat above.
-        return True
+        # A hostname rather than a literal address.
+        return _is_public_hostname(host)
 
     return not (
         address.is_private
@@ -94,3 +96,55 @@ def is_safe_to_proxy(url: str) -> bool:
         or address.is_unspecified
         or address.is_multicast
     )
+
+
+# Suffixes that never resolve to anything on the public internet.
+_INTERNAL_SUFFIXES = (
+    ".local",
+    ".localhost",
+    ".localdomain",
+    ".internal",
+    ".intranet",
+    ".lan",
+    ".home",
+    ".home.arpa",
+    ".corp",
+    ".private",
+    ".test",
+    ".invalid",
+    ".example",
+)
+
+
+def _is_public_hostname(host: str) -> bool:
+    """Whether a hostname could plausibly name a public host.
+
+    **This closes a gap that measurement found.** Blocking private IP literals
+    is not enough inside Docker, because the embedded DNS server resolves
+    service names: ``http://valkey:6379/`` and ``http://api:8000/`` are
+    hostnames, so an IP-literal check waves them through, and SearXNG — which
+    has egress and sits on the same network — would happily fetch them. Probing
+    from inside the container confirmed both were reachable, along with an
+    unrelated project's database on the same host.
+
+    The rule that fixes it: **a single-label hostname is never public.** Every
+    routable public name has at least one dot (``example.com``), while internal
+    Docker service names, ``localhost``, and short intranet names do not. That
+    one check removes the entire container-DNS attack surface.
+
+    Known internal suffixes are rejected too, for names like
+    ``db.internal`` that do carry a dot.
+
+    What this still does not catch, stated plainly: a *public* name whose DNS
+    record points at a private address. Resolving to check is impossible here —
+    the API container has no external DNS by design (ADR-0004) — so that case
+    needs an egress policy on the fetching side, tracked in SF-003.
+    """
+    if not host or " " in host:
+        return False
+
+    # Single-label: no dot at all. Covers `valkey`, `api`, `localhost`.
+    if "." not in host:
+        return False
+
+    return not host.endswith(_INTERNAL_SUFFIXES)
