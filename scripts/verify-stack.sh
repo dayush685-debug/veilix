@@ -267,6 +267,40 @@ print(f'  {G}PASS{Y}  all {len(names)} metric labels are on the approved list')
 fi
 
 # ---------------------------------------------------------------------------
+head_ "Configuration completeness"
+# ---------------------------------------------------------------------------
+
+# Every setting the application defines must actually reach the container.
+#
+# This guards a bug that produced no error at all: nine documented settings
+# were missing from a hand-maintained `environment:` list, so changing them in
+# .env did nothing. The operator edits a value, restarts, and the behaviour is
+# unchanged - the worst kind of failure, because it looks like the setting
+# simply had no effect.
+if docker exec veilix-api sh -c 'env' >/dev/null 2>&1; then
+  docker exec veilix-api python -c "
+import os, sys
+from veilix.core.config import Settings
+G,R,Y='[32m','[31m','[0m'
+# Fields sourced from elsewhere: the shared SearXNG secret has no VEILIX_
+# prefix, and the two topology values are set by compose directly.
+EXEMPT={'searxng_secret','searxng_url','valkey_url'}
+missing=sorted(
+    'VEILIX_'+f.upper()
+    for f in Settings.model_fields
+    if f not in EXEMPT and 'VEILIX_'+f.upper() not in os.environ
+)
+if missing:
+    print(f'  {R}FAIL{Y}  settings defined by the app but never passed to the container: {missing}')
+    sys.exit(1)
+print(f'  {G}PASS{Y}  all {len(Settings.model_fields)} settings reach the container')
+" 2>/dev/null || bad "some application settings never reach the container"
+else
+  printf '  [33mSKIP[0m  api container not running
+'
+fi
+
+# ---------------------------------------------------------------------------
 head_ "Edge (Caddy)"
 # ---------------------------------------------------------------------------
 

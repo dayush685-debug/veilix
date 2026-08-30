@@ -208,41 +208,30 @@ services:
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=32m
-    # Configuration arrives via env_file with `format: raw`, NOT via
-    # `environment:` interpolation.
+    # The WHOLE of .env reaches the container, rather than a hand-maintained
+    # list of variables in `environment:`.
     #
-    # This is not a style preference. An Argon2 hash looks like
-    # `$argon2id$v=19$m=65536,...`, and Compose interpolates `$` in both
-    # `environment:` values and ordinary env_file entries — so the hash reaches
-    # the container as `=19=65536,...`. The service starts, looks healthy, and
-    # rejects every correct admin password. Compose does warn, on a line that
-    # scrolls past during a normal `up`.
+    # That list was the bug. Nine documented settings - the API-key rate limit,
+    # both circuit-breaker knobs, retries, safesearch and language defaults,
+    # max page, metrics toggle, CORS origins - were absent from it, so setting
+    # any of them in .env did nothing at all. No error, no warning: the
+    # operator changes a value, restarts, and the behaviour is unchanged.
+    # Found while raising a limit for a load test and watching it not apply.
     #
-    # `format: raw` disables interpolation and passes values through verbatim.
-    # Measured both ways before choosing this.
+    # `format: raw` is required on both files. Compose interpolates `$` in
+    # every file it loads for interpolation, which mangles the Argon2 hashes
+    # in .env.secrets into something that rejects every correct password.
     env_file:
+      - path: .env
+        format: raw
       - path: .env.secrets
         format: raw
     environment:
-      # Compose-internal addressing. Declared here rather than in .env because
-      # these are topology, not operator configuration, and `environment:`
-      # overrides env_file. Neither value contains a `$`.
+      # Compose-internal addressing only. These are topology rather than
+      # operator configuration, and `environment:` overrides env_file, so a
+      # stale VEILIX_SEARXNG_URL in someone's .env cannot break the wiring.
       VEILIX_SEARXNG_URL: "http://searxng:8080"
       VEILIX_VALKEY_URL: "valkey://valkey:6379/0"
-      # Interpolated from .env. Safe to interpolate: these are hex and
-      # alphanumeric values with no '$' for Compose to substitute.
-      VEILIX_ENV: "${VEILIX_ENV:-development}"
-      VEILIX_LOG_LEVEL: "${VEILIX_LOG_LEVEL:-info}"
-      SEARXNG_SECRET: "${SEARXNG_SECRET:?required - generate with openssl rand -hex 32}"
-      VEILIX_RATELIMIT_SALT_SEED: "${VEILIX_RATELIMIT_SALT_SEED:-}"
-      VEILIX_ADMIN_USERNAME: "${VEILIX_ADMIN_USERNAME:-admin}"
-      VEILIX_CACHE_ENABLED: "${VEILIX_CACHE_ENABLED:-true}"
-      VEILIX_CACHE_TTL_S: "${VEILIX_CACHE_TTL_S:-300}"
-      VEILIX_RATELIMIT_ENABLED: "${VEILIX_RATELIMIT_ENABLED:-true}"
-      VEILIX_RATELIMIT_REQUESTS: "${VEILIX_RATELIMIT_REQUESTS:-60}"
-      VEILIX_RATELIMIT_WINDOW_S: "${VEILIX_RATELIMIT_WINDOW_S:-60}"
-      VEILIX_SEARCH_TIMEOUT_S: "${VEILIX_SEARCH_TIMEOUT_S:-8.0}"
-      VEILIX_OTLP_ENDPOINT: "${VEILIX_OTLP_ENDPOINT:-}"
     <<: *default-hardening
     logging: *default-logging
     healthcheck:

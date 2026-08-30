@@ -6,12 +6,13 @@ A privacy-first, self-hostable meta-search platform built around
 It aggregates results from many search engines without accounts, without cookies, without
 search history, and without building a profile of the person asking.
 
-> **Build status: Phase 5 of 10 complete.** The full stack runs as four containers that
+> **Build status: Phase 6 of 10 complete.** The full stack runs as four containers that
 > are all non-root, read-only-rootfs, `cap_drop: ALL`, and `no-new-privileges`. 178 tests
-> pass (161 backend, 17 frontend), `scripts/verify-stack.sh` asserts **32 architectural
-> and security claims** against the running stack, and `scripts/security-scan.sh` reports
-> zero fixable HIGH/CRITICAL vulnerabilities across both images. This README is filled out
-> as each phase completes, and no capability is described here before it exists.
+> pass, `scripts/verify-stack.sh` asserts **33 claims** against the running stack,
+> `scripts/security-scan.sh` reports zero fixable HIGH/CRITICAL vulnerabilities, and
+> performance and failure behaviour are measured in
+> [docs/performance.md](docs/performance.md). This README is filled out as each phase
+> completes, and no capability is described here before it exists.
 
 ## Why this exists
 
@@ -28,6 +29,18 @@ the platform around it:
 - a rate limiter that counts clients **without storing IP addresses**
 - network isolation that leaves the API container **with no route to the internet at all**
 - observability that measures the system without surveilling its users
+
+## Measured, not claimed
+
+```
+warm search (cache hit)      p50 4.96 ms   p95 10.37 ms
+cold search (upstream)       p50 795 ms    p95 5.94 s
+cached query, backend DOWN   86 ms — the cache is consulted before the breaker
+breaker sheds a request      12 ms, versus 7.7 s waiting for a dead dependency
+```
+
+Measured on a laptop that was also running the load generator; see
+[docs/performance.md §1](docs/performance.md) before quoting any of it.
 
 ## Failure is the normal case
 
@@ -64,6 +77,7 @@ Full detail in **[docs/architecture.md](docs/architecture.md)**.
 | [docs/architecture.md](docs/architecture.md) | Topology, request flow, technology decisions, verified SearXNG facts |
 | [docs/privacy.md](docs/privacy.md) | Complete data inventory, retention, and what the operator can still observe |
 | [docs/api.md](docs/api.md) | API reference, and the two behaviours that will surprise a client |
+| [docs/performance.md](docs/performance.md) | Measured latency, throughput, and failure behaviour |
 | [docs/threat-model.md](docs/threat-model.md) | Actors, trust boundaries, controls, and residual risk |
 | [docs/security-findings.md](docs/security-findings.md) | Every security finding, open and fixed, with evidence |
 | [docs/adr/](docs/adr/) | Architecture decision records, including what was rejected and why |
