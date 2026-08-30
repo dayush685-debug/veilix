@@ -277,27 +277,31 @@ head_ "Configuration completeness"
 # .env did nothing. The operator edits a value, restarts, and the behaviour is
 # unchanged - the worst kind of failure, because it looks like the setting
 # simply had no effect.
-if docker exec veilix-api sh -c 'env' >/dev/null 2>&1; then
-  docker exec veilix-api python -c "
-import os, sys
+if ! docker exec veilix-api sh -c 'env' >/dev/null 2>&1; then
+  printf '  [33mSKIP[0m  api container not running
+'
+else
+  # The python side stays silent and signals with its exit code, so the bash
+  # PASS/FAIL counter stays accurate. Checks that print their own result look
+  # right on screen and quietly do not get counted.
+  MISSING=$(docker exec veilix-api python -c "
+import os
 from veilix.core.config import Settings
-G,R,Y='[32m','[31m','[0m'
-# Fields sourced from elsewhere: the shared SearXNG secret has no VEILIX_
-# prefix, and the two topology values are set by compose directly.
+# Sourced elsewhere: the shared SearXNG secret has no VEILIX_ prefix, and the
+# two topology values are set directly by compose.
 EXEMPT={'searxng_secret','searxng_url','valkey_url'}
-missing=sorted(
+print(' '.join(sorted(
     'VEILIX_'+f.upper()
     for f in Settings.model_fields
     if f not in EXEMPT and 'VEILIX_'+f.upper() not in os.environ
-)
-if missing:
-    print(f'  {R}FAIL{Y}  settings defined by the app but never passed to the container: {missing}')
-    sys.exit(1)
-print(f'  {G}PASS{Y}  all {len(Settings.model_fields)} settings reach the container')
-" 2>/dev/null || bad "some application settings never reach the container"
-else
-  printf '  [33mSKIP[0m  api container not running
-'
+)))
+" 2>/dev/null)
+
+  if [ -z "${MISSING}" ]; then
+    ok "every application setting reaches the container"
+  else
+    bad "settings defined by the app but never passed to the container: ${MISSING}"
+  fi
 fi
 
 # ---------------------------------------------------------------------------
