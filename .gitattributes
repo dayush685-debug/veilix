@@ -1,0 +1,17 @@
+# Normalise to LF in the repository.
+* text=auto eol=lf
+
+# Files consumed by Linux containers MUST stay LF; CRLF breaks shebangs
+# and Caddy/SearXNG config parsing when built on Windows.
+*.sh      text eol=lf
+*.yml     text eol=lf
+*.yaml    text eol=lf
+*.toml    text eol=lf
+Dockerfile text eol=lf
+Caddyfile text eol=lf
+
+# Binary
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff2 binary
