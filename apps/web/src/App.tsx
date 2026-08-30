@@ -2,6 +2,7 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { PrefsProvider } from '@/hooks/usePrefs';
 import { About } from '@/pages/About';
+import { Admin } from '@/pages/Admin';
 import { Home } from '@/pages/Home';
 import { NotFound } from '@/pages/NotFound';
 import { Privacy } from '@/pages/Privacy';
@@ -22,6 +23,7 @@ export function App() {
             <Route path="privacy" element={<Privacy />} />
             <Route path="about" element={<About />} />
             <Route path="status" element={<Status />} />
+            <Route path="admin" element={<Admin />} />
             <Route path="shortcuts" element={<Shortcuts />} />
             <Route path="*" element={<NotFound />} />
           </Route>

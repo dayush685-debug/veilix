@@ -315,6 +315,121 @@ services:
         limits:
           memory: 128M
 
+  # -------------------------------------------------------------------------
+  # Observability — opt-in.
+  #
+  #   docker compose --profile observability up -d
+  #
+  # Behind a profile because Prometheus and Grafana together cost roughly as
+  # much memory as the entire core stack, and a 2.77 GiB Docker VM cannot spare
+  # that by default. It is also the honest split: an instance can serve search
+  # perfectly well without them, so they should not be a precondition for
+  # running the product.
+  #
+  # Neither publishes a port in the production file. Grafana's login is a real
+  # authentication surface and Prometheus has none at all, so exposing either
+  # to the internet would undo the topology in ADR-0004. Reach them through the
+  # dev override, or an SSH tunnel in production.
+  # -------------------------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    container_name: veilix-prometheus
+    profiles: ["observability"]
+    restart: unless-stopped
+    user: "65534:65534"
+    read_only: true
+    networks:
+      # `backend` ONLY, and never published.
+      #
+      # Prometheus has no authentication whatsoever, so anything that can reach
+      # it can read every metric and, worse, use it as a scanner. Being on an
+      # internal:true network makes that structural rather than a matter of
+      # remembering: the network has no gateway, so a `ports:` entry here would
+      # be silently inert even if someone added one.
+      #
+      # Humans reach these metrics through Grafana, which proxies queries over
+      # this network. Nobody needs to reach Prometheus directly.
+      - backend
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infra/prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus_data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      # 15 days. Operational aggregates age out of usefulness quickly, and
+      # unbounded retention on a small host is how a disk fills.
+      - --storage.tsdb.retention.time=15d
+      - --storage.tsdb.retention.size=1GB
+      # kingpin syntax: boolean flags are negated with --no-<flag>, not
+      # "=false", which it rejects outright with "unexpected false".
+      # Off by default anyway; stated explicitly because a reload endpoint
+      # that can re-read config at runtime is a surface worth denying.
+      - --no-web.enable-lifecycle
+    <<: *default-hardening
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "-T", "5", "http://127.0.0.1:9090/-/healthy"]
+      interval: 30s
+      timeout: 6s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+
+  grafana:
+    image: grafana/grafana:11.5.1
+    container_name: veilix-grafana
+    profiles: ["observability"]
+    restart: unless-stopped
+    user: "472:472"
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    networks:
+      # `edge` as well as `backend`, because unlike Prometheus this one is meant
+      # for a human to open. It queries Prometheus over `backend` in proxy mode,
+      # so the browser never talks to Prometheus directly.
+      - edge
+      - backend
+    volumes:
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: "${GRAFANA_ADMIN_USER:-admin}"
+      GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD before enabling the observability profile}"
+      # Anonymous access off, sign-up off, and no phoning home: this is an
+      # operations tool, not a public page, and it should not report usage
+      # anywhere on a privacy-first deployment.
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+      GF_SECURITY_COOKIE_SECURE: "true"
+      GF_SECURITY_COOKIE_SAMESITE: "strict"
+      GF_SECURITY_CONTENT_TYPE_PROTECTION: "true"
+      GF_SECURITY_DISABLE_GRAVATAR: "true"
+    <<: *default-hardening
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider -T 5 http://127.0.0.1:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 6s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
 volumes:
   caddy_data:
   caddy_config:
+  prometheus_data:
+  grafana_data:
+

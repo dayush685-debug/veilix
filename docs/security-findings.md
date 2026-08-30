@@ -313,3 +313,72 @@ internal suffix, plus a test asserting ordinary public hostnames still work.
 passes, and cannot be caught here — the API container has no external DNS by design
 (ADR-0004), so the isolation that contains an attacker also prevents this check from
 resolving anything. Rolled into SF-003.
+
+
+---
+
+## SF-011 — OpenTelemetry traces exported search queries
+
+- **Found**: Phase 7, canary query against a live collector
+- **Severity**: **High** for the product
+- **Status**: FIXED in Phase 7
+
+OpenTelemetry's HTTP instrumentations record the full request URL by default. With
+tracing enabled, every search exported:
+
+```
+http.url = http://searxng:8080/search?q=CANARYTRACE98765&format=json&categories=general
+http.url = http://127.0.0.1:8088/api/v1/search?q=CANARYTRACE98765&category=general
+```
+
+to whatever trace backend the operator had configured — user queries shipped off-box, in
+direct contradiction of `docs/privacy.md` §4.
+
+This is worse than an ordinary logging mistake for two reasons. Nobody thinks of a tracing
+backend as somewhere search history accumulates, and the trigger is entirely benign:
+someone enables tracing to debug a latency problem and silently starts exporting what
+people searched for.
+
+**Found with a canary**, not by reading the instrumentation's source. The value of running
+a real collector and grepping its output for a known string is that it tests what the
+system *does* rather than what the code appears to say.
+
+**Fix**: a span processor strips everything after `?` from `http.url` and `url.full`
+before export. The path is kept — it is useful and carries no user data. Verified with a
+fresh collector: the canary string appears nowhere in exported spans, and spans still
+arrive with useful names and route attributes.
+
+Pinned by `tests/unit/test_telemetry_redaction.py`, because the symptom is invisible from
+inside the process — the application behaves identically whether or not the leak exists.
+
+**Implementation note worth keeping.** The processor was first written as a duck-typed
+class and broke tracing outright: the SDK calls a private `_on_ending` hook on every
+processor, so a class that merely looks like a `SpanProcessor` raises inside `span.end()`.
+Structural typing is not enough when the protocol has private members. It subclasses the
+real base class now, defined inside the successful-import block so the SDK stays optional.
+
+---
+
+## SF-012 — Tracing was configured but non-functional in two ways
+
+- **Found**: Phase 7, while verifying tracing end to end
+- **Severity**: Low (observability, not security)
+- **Status**: FIXED in Phase 7
+
+Two independent defects, both of which made a documented feature silently do nothing —
+the same class as the Phase 6 missing-environment-variables bug.
+
+**The SDK was not installed.** The Dockerfile ran `pip install .` rather than
+`pip install ".[otel]"`, so `setup_tracing` hit its `ImportError` branch and returned
+`False`. An operator could set `VEILIX_OTLP_ENDPOINT`, restart, and get no traces and no
+explanation. The extra is now installed, and the import failure logs an error naming the
+fix instead of failing silently.
+
+**Server spans were never created.** `FastAPIInstrumentor.instrument_app` was called from
+lifespan, which runs after the application object is assembled. Starlette builds its
+middleware stack once, so the instrumentation middleware never made it in: outgoing httpx
+client spans appeared and HTTP server spans did not. Tracing looked enabled and was half
+missing. Setup moved into the app factory, before the app serves anything.
+
+**How both were caught**: by running a real OTel collector, sending a request, and
+counting spans. One span arrived where six were expected.

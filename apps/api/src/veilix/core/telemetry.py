@@ -12,7 +12,8 @@ fixed sets: route templates, engine names, and outcome enums.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Final
+import logging
+from typing import TYPE_CHECKING, Any, Final
 
 from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram
 
@@ -156,6 +157,41 @@ def status_class(status_code: int) -> str:
     return f"{status_code // 100}xx"
 
 
+# URL attributes that OpenTelemetry populates with a full URL, query string
+# included. There are two names because the semantic conventions renamed the
+# attribute; instrumentations in the wild still emit both.
+_URL_ATTRIBUTES: Final = ("http.url", "url.full")
+
+
+def _redact_span_urls(span: Any) -> None:
+    """Strip the query string from a span's URL attributes.
+
+    **This exists because tracing leaked search queries.** OpenTelemetry's HTTP
+    instrumentations record the full request URL by default, so a traced search
+    exported
+
+        http.url = http://searxng:8080/search?q=<the user's query>&...
+
+    to whatever trace backend the operator had configured. Caught with a canary
+    query, not by reading the instrumentation's source.
+
+    That is precisely the failure docs/privacy.md §4 forbids, and it is worse
+    than an ordinary logging mistake because nobody thinks of a tracing backend
+    as somewhere search history accumulates. Someone enables tracing to debug a
+    latency problem and silently starts shipping queries.
+
+    The path is kept - it is genuinely useful and carries no user data. Only
+    what follows `?` is dropped.
+    """
+    attributes = getattr(span, "_attributes", None)
+    if not attributes:
+        return
+    for key in _URL_ATTRIBUTES:
+        value = attributes.get(key)
+        if isinstance(value, str) and "?" in value:
+            attributes[key] = value.split("?", 1)[0]
+
+
 def setup_tracing(app: FastAPI, *, endpoint: str, service_name: str = "veilix-api") -> bool:
     """Enable OpenTelemetry export when a collector endpoint is configured.
 
@@ -176,14 +212,46 @@ def setup_tracing(app: FastAPI, *, endpoint: str, service_name: str = "veilix-ap
         from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
         from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
         from opentelemetry.sdk.resources import Resource
-        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.sdk.trace import SpanProcessor, TracerProvider
         from opentelemetry.sdk.trace.export import BatchSpanProcessor
-    except ImportError:
-        # The otel extra is optional; a missing dependency must not stop the
-        # service from serving search.
+    except ImportError as exc:
+        # A missing dependency must not stop the service from serving search —
+        # but it must not be silent either.
+        #
+        # This exact case shipped once: the image installed the package without
+        # its `otel` extra, so an operator could set the endpoint, restart, and
+        # get no traces and no explanation. Returning False quietly turned a
+        # packaging mistake into a mystery. If someone configured an endpoint,
+        # they expect traces, and the absence of them is worth a loud line.
+        logging.getLogger(__name__).error(
+            "tracing_requested_but_sdk_missing endpoint=%s error=%s "
+            "fix=install the API package with its [otel] extra",
+            endpoint,
+            exc,
+        )
         return False
 
     provider = TracerProvider(resource=Resource.create({"service.name": service_name}))
+
+    # Defined here, inside the successful-import block, so the SDK stays an
+    # optional dependency while this still SUBCLASSES the real base class.
+    #
+    # Duck-typing it was tried first and broke tracing outright: the SDK calls
+    # an internal `_on_ending` hook on every processor, and a class that merely
+    # looks like a SpanProcessor raises inside span.end(). Subclassing inherits
+    # that hook. Structural typing is not enough when the "protocol" has
+    # private members.
+    class QueryRedactingProcessor(SpanProcessor):
+        def on_start(self, span: Any, parent_context: Any = None) -> None:
+            return None
+
+        def on_end(self, span: Any) -> None:
+            _redact_span_urls(span)
+
+    # Order matters: redaction runs BEFORE the batch processor that exports.
+    # Processors run in registration order, so one added after the exporter
+    # would be redacting spans that have already left.
+    provider.add_span_processor(QueryRedactingProcessor())
     provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint)))
     trace.set_tracer_provider(provider)
 

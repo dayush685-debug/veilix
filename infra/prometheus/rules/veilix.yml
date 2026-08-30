@@ -1,0 +1,89 @@
+# Alerting and recording rules.
+#
+# Every alert here describes a condition an operator would want to act on. An
+# alert nobody acts on trains people to ignore alerts, so conditions that are
+# merely interesting are left as dashboard panels instead.
+#
+# Note what is deliberately absent: nothing alerts on individual users,
+# because no metric carries a user-derived label (docs/privacy.md §8).
+
+groups:
+  - name: veilix-availability
+    interval: 30s
+    rules:
+      - alert: VeilixApiDown
+        expr: up{job="veilix-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Veilix API is not being scraped"
+          description: >-
+            Prometheus cannot reach the API. Either the service is down or the
+            internal network is broken.
+
+      - alert: SearchBackendCircuitOpen
+        # 2 = open. The breaker sheds load rather than queuing against a wedged
+        # backend, so this is the system working — but it means users are
+        # getting 503s and someone should look at SearXNG.
+        expr: veilix_breaker_state{dependency="searxng"} == 2
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Circuit breaker open for the search backend"
+          description: >-
+            Veilix is shedding search requests to let SearXNG recover. Check
+            the searxng container.
+
+  - name: veilix-quality
+    interval: 30s
+    rules:
+      - alert: HighServerErrorRate
+        expr: |
+          sum(rate(veilix_http_requests_total{status_class="5xx"}[5m]))
+            /
+          clamp_min(sum(rate(veilix_http_requests_total[5m])), 0.001)
+            > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Over 5% of requests are returning 5xx"
+
+      - alert: SearchLatencyDegraded
+        # p95 above 10s means users are waiting past the point most will stay.
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(veilix_search_duration_seconds_bucket{cache="miss"}[10m])) by (le)
+          ) > 10
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "p95 cold search latency above 10s"
+          description: >-
+            Usually upstream engines being slow rather than a fault here.
+            Check which engines are failing before changing anything.
+
+  - name: veilix-recording
+    interval: 30s
+    rules:
+      # Precomputed because the dashboard reads it on every refresh and the
+      # expression is not cheap.
+      - record: veilix:cache_hit_ratio:5m
+        expr: |
+          sum(rate(veilix_cache_operations_total{outcome="hit"}[5m]))
+            /
+          clamp_min(
+            sum(rate(veilix_cache_operations_total{outcome=~"hit|miss"}[5m])),
+            0.001
+          )
+
+      - record: veilix:search_p95_seconds:5m
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(veilix_search_duration_seconds_bucket[5m])) by (le, cache)
+          )

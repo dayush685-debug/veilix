@@ -370,5 +370,58 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+head_ "Observability (opt-in profile)"
+# ---------------------------------------------------------------------------
+
+if ! docker ps --format '{{.Names}}' | grep -q veilix-prometheus; then
+  printf '  [33mSKIP[0m  observability profile not running (docker compose --profile observability up -d)
+'
+else
+  # Checked from inside, because Prometheus sits on an internal:true network
+  # and is deliberately unreachable from the host (see docker-compose.yml).
+  TARGETS=$(docker exec veilix-prometheus wget -qO- http://127.0.0.1:9090/api/v1/targets 2>/dev/null |
+    python -c "
+import json,sys
+try: d=json.load(sys.stdin)
+except Exception: print('PARSE_FAIL'); raise SystemExit
+t=d['data']['activeTargets']
+down=[x['labels'].get('job') for x in t if x['health']!='up']
+print('DOWN:'+','.join(down) if down else f'OK:{len(t)}')
+" 2>/dev/null)
+
+  case "${TARGETS}" in
+    OK:*) ok "prometheus scraping ${TARGETS#OK:} targets, all up" ;;
+    *)    bad "prometheus targets unhealthy (${TARGETS})" ;;
+  esac
+
+  RULES=$(docker exec veilix-prometheus wget -qO- http://127.0.0.1:9090/api/v1/rules 2>/dev/null |
+    python -c "
+import json,sys
+try: d=json.load(sys.stdin)
+except Exception: print('PARSE_FAIL'); raise SystemExit
+bad=[r['name'] for g in d['data']['groups'] for r in g['rules'] if r.get('health')!='ok']
+print('BAD:'+','.join(bad) if bad else 'OK')
+" 2>/dev/null)
+  [ "${RULES}" = "OK" ] && ok "all prometheus rules evaluating cleanly"                         || bad "prometheus rules unhealthy (${RULES})"
+
+  # Prometheus must NOT be reachable from the host: it has no authentication
+  # whatsoever, so anything that can reach it can read every metric.
+  if curl -sf -m 5 http://127.0.0.1:19090/-/healthy >/dev/null 2>&1; then
+    bad "prometheus is reachable from the host - it has no authentication"
+  else
+    ok "prometheus is not reachable from the host"
+  fi
+
+  if docker ps --format '{{.Names}}' | grep -q veilix-grafana; then
+    CODE=$(curl -s -o /dev/null -w '%{http_code}' -m 10 http://127.0.0.1:13000/api/health)
+    [ "${CODE}" = "200" ] && ok "grafana is up" || bad "grafana health returned ${CODE}"
+
+    # Anonymous access must be off, or the dashboard is public.
+    CODE=$(curl -s -o /dev/null -w '%{http_code}' -m 10 http://127.0.0.1:13000/api/datasources)
+    [ "${CODE}" = "401" ] && ok "grafana requires authentication"                           || bad "grafana datasources returned ${CODE} without credentials"
+  fi
+fi
+
+# ---------------------------------------------------------------------------
 printf '\n\033[1mResult:\033[0m %d passed, %d failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ] || exit 1

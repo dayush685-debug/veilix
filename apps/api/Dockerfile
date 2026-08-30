@@ -31,9 +31,15 @@ ENV PATH="/opt/venv/bin:$PATH"
 # Install dependencies against a stub package so the layer does not depend on
 # application source. `pip install .` here would invalidate this cache on every
 # source change, which is the mistake that makes Python image builds slow.
+#
+# The [otel] extra is included deliberately. Without it, setting
+# VEILIX_OTLP_ENDPOINT does nothing at all - the SDK import fails and tracing
+# stays off - which is a documented configuration knob that silently lies.
+# Tracing still only EXPORTS when an endpoint is configured; this just means
+# the capability exists when someone asks for it.
 RUN mkdir -p src/veilix \
     && printf '__version__ = "0.0.0"\n' > src/veilix/__init__.py \
-    && pip install --no-cache-dir .
+    && pip install --no-cache-dir ".[otel]"
 
 COPY src/ ./src/
 
@@ -50,7 +56,7 @@ COPY src/ ./src/
 # Verified the hard way — the image started, served traffic, and reported
 # version 0.0.0.
 RUN rm -rf build/ src/*.egg-info *.egg-info \
-    && pip install --no-cache-dir --no-deps --force-reinstall .
+    && pip install --no-cache-dir --no-deps --force-reinstall ".[otel]"
 
 # ---------------------------------------------------------------------------
 # Stage 2 — runtime

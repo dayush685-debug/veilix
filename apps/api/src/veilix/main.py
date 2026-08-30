@@ -131,7 +131,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
 
     build_info.labels(version=__version__, environment=settings.env).set(1)
-    tracing_on = setup_tracing(app, endpoint=settings.otlp_endpoint)
 
     log.info(
         "startup",
@@ -143,7 +142,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         ratelimit=f"{settings.ratelimit_requests}/{settings.ratelimit_window_s}s",
         api_keys_configured=len(settings.api_key_digests),
         admin_configured=bool(settings.admin_password_hash),
-        tracing_enabled=tracing_on,
+        tracing_enabled=getattr(app.state, "tracing_enabled", False),
         # Warn rather than fail: without the shared secret, image proxying
         # cannot be signed, so thumbnails would have to be dropped rather than
         # silently served from third-party hosts.
@@ -214,6 +213,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
 
     app.include_router(api_router)
+
+    # Tracing is set up HERE, not in lifespan.
+    #
+    # FastAPIInstrumentor.instrument_app adds middleware, and Starlette builds
+    # its middleware stack once, on the first request. Lifespan runs after the
+    # application object is assembled, so instrumenting there is too late for
+    # the server middleware to be included: outgoing httpx spans still appear
+    # and HTTP server spans silently do not.
+    #
+    # Measured, which is the only reason this was noticed - a traced search
+    # produced exactly one span, from the httpx client, and no request span at
+    # all. Tracing looked enabled and was half missing.
+    app.state.tracing_enabled = setup_tracing(app, endpoint=settings.otlp_endpoint)
+
     return app
 
 

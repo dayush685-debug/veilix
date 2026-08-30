@@ -1,0 +1,18 @@
+# Datasource provisioning.
+#
+# Declared in a file rather than clicked in the UI, so a fresh Grafana comes up
+# already wired. Configuration a human has to reapply after a volume is lost is
+# configuration that will eventually be wrong.
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      timeInterval: 15s
+      httpMethod: POST

@@ -1,0 +1,393 @@
+{
+  "uid": "veilix-ops",
+  "title": "Veilix — Operations",
+  "description": "Operational health only. No panel here can be sliced by user, because no metric carries a user-derived label (docs/privacy.md §8). This dashboard answers 'is the system healthy', never 'what did people search for'.",
+  "tags": ["veilix", "operations"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": false,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": { "list": [] },
+  "panels": [
+    {
+      "type": "row",
+      "title": "Service health",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Search backend circuit",
+      "description": "0 closed, 1 half-open, 2 open. Open means Veilix is deliberately shedding load so SearXNG can recover — the system working, but users are seeing 503s.",
+      "gridPos": { "h": 5, "w": 5, "x": 0, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "veilix_breaker_state{dependency=\"searxng\"}",
+          "legendFormat": "breaker",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "value",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": { "text": "CLOSED", "color": "green", "index": 0 },
+                "1": { "text": "HALF-OPEN", "color": "orange", "index": 1 },
+                "2": { "text": "OPEN", "color": "red", "index": 2 }
+              }
+            }
+          ],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "noValue": "no data"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Cache hit ratio",
+      "description": "Recorded rule veilix:cache_hit_ratio:5m. Shows 'no data' rather than 0% before any lookup has happened — those mean different things.",
+      "gridPos": { "h": 5, "w": 5, "x": 5, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "veilix:cache_hit_ratio:5m", "legendFormat": "hit ratio", "refId": "A" }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "decimals": 1,
+          "noValue": "no lookups yet",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 0.2 },
+              { "color": "green", "value": 0.4 }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Searches returning partial results",
+      "description": "Share of searches where at least one upstream engine failed. On a self-hosted instance this is normally HIGH and is not a fault — upstreams CAPTCHA and rate-limit small instances. Watch for changes, not for the absolute value.",
+      "gridPos": { "h": 5, "w": 7, "x": 10, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum(rate(veilix_search_requests_total{outcome=\"degraded\"}[10m])) / clamp_min(sum(rate(veilix_search_requests_total[10m])), 0.001)",
+          "legendFormat": "degraded",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "none",
+        "graphMode": "area",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "decimals": 0,
+          "noValue": "no searches yet"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Rate-limit blocks",
+      "description": "Requests refused by the limiter. A rising line here is usually abuse being absorbed rather than a problem.",
+      "gridPos": { "h": 5, "w": 7, "x": 17, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum(rate(veilix_ratelimit_events_total{decision=\"blocked\"}[5m]))",
+          "legendFormat": "blocked/s",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "none",
+        "graphMode": "area",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "decimals": 2, "noValue": "0" },
+        "overrides": []
+      }
+    },
+    {
+      "type": "row",
+      "title": "Traffic and latency",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 6 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Request rate by status class",
+      "description": "Stacked, because the parts sum to a meaningful whole: total traffic. Status class rather than exact code keeps the series count readable and the label cardinality bounded.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 7 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (status_class) (rate(veilix_http_requests_total[5m]))",
+          "legendFormat": "{{status_class}}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true, "calcs": ["mean"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 20,
+            "showPoints": "never",
+            "stacking": { "mode": "normal", "group": "A" },
+            "axisLabel": "requests/s"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "5xx" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "4xx" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "orange" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "2xx" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }]
+          }
+        ]
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Search latency percentiles",
+      "description": "Deliberately a SEPARATE panel from request rate rather than a second y-axis on it. Two measures with different scales on one plot invite false correlation; the shared time axis already lets you compare them.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 7 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(veilix_search_duration_seconds_bucket[5m])) by (le, cache))",
+          "legendFormat": "p50 {{cache}}",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(veilix_search_duration_seconds_bucket[5m])) by (le, cache))",
+          "legendFormat": "p95 {{cache}}",
+          "refId": "B"
+        }
+      ],
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "axisLabel": "seconds",
+            "scaleDistribution": { "type": "log", "log": 10 }
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "row",
+      "title": "Upstream engines",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Engine failures by cause",
+      "description": "From SearXNG's unresponsive_engines on real queries, not synthetic probes — so an engine nobody searched has no line here, which is 'unknown', not 'healthy'. Causes are folded into a bounded set; raw upstream text would be unbounded label cardinality.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (reason) (rate(veilix_engine_failures_total[10m]))",
+          "legendFormat": "{{reason}}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true, "calcs": ["mean"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 15,
+            "showPoints": "never",
+            "stacking": { "mode": "normal", "group": "A" },
+            "axisLabel": "failures/s"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 8,
+      "type": "bargauge",
+      "title": "Engines contributing results",
+      "description": "Which engines are actually earning their place. A bar gauge rather than a time series: the question is a ranked comparison right now, not a trend.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "topk(10, sum by (engine) (rate(veilix_engine_results_total[30m])))",
+          "legendFormat": "{{engine}}",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "showUnfilled": true,
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 2,
+          "noValue": "no engine data yet",
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "row",
+      "title": "Cache and limiter",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 24 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Cache operations by outcome",
+      "description": "hit, miss, error, disabled. A rising 'error' line means Valkey is unwell — search keeps working but every request pays full upstream latency.",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 25 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (outcome) (rate(veilix_cache_operations_total[5m]))",
+          "legendFormat": "{{outcome}}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 15,
+            "showPoints": "never",
+            "stacking": { "mode": "normal", "group": "A" }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "hit" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "error" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }]
+          }
+        ]
+      }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Rate limiter decisions",
+      "description": "Split by identity kind so an operator can tell anonymous abuse from an API consumer exceeding its budget. The identity label is a bounded enum — 'anonymous' or 'api_key' — never a client identifier.",
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 25 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (identity, decision) (rate(veilix_ratelimit_events_total[5m]))",
+          "legendFormat": "{{identity}} {{decision}}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      }
+    }
+  ]
+}

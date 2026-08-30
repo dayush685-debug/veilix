@@ -1,0 +1,31 @@
+# Prometheus scrape configuration for Veilix.
+#
+# Pull-based on purpose. A push-based agent would need an outbound path from
+# the API container, which ADR-0004 deliberately does not have — and it would
+# ship telemetry off-box, which is exactly what this product refuses to do.
+# Prometheus reaches in over the internal network instead.
+
+global:
+  # 15s balances dashboard freshness against series volume on a small host.
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  evaluation_interval: 15s
+  external_labels:
+    instance_name: veilix
+
+scrape_configs:
+  - job_name: veilix-api
+    metrics_path: /api/v1/metrics
+    static_configs:
+      - targets: ["api:8000"]
+        labels:
+          service: api
+
+  # Prometheus scraping itself, so "is monitoring up" is answerable from
+  # inside the monitoring system rather than only by looking at it.
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+rule_files:
+  - /etc/prometheus/rules/*.yml

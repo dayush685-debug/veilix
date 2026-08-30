@@ -33,3 +33,16 @@ services:
       - "127.0.0.1:18000:8000"
     environment:
       VEILIX_LOG_LEVEL: debug
+
+  # Prometheus is deliberately NOT published, even here.
+  #
+  # It sits only on `backend`, which is internal:true and has no gateway, so a
+  # ports: entry would be silently inert - the same measured behaviour as
+  # Valkey above. That is the right outcome regardless: Prometheus has no
+  # authentication at all. Inspect it with
+  #   docker exec veilix-prometheus wget -qO- http://127.0.0.1:9090/api/v1/targets
+  # or reach it through Grafana, which is what it is there for.
+
+  grafana:
+    ports:
+      - "127.0.0.1:13000:3000"
