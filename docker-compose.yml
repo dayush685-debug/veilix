@@ -235,3 +235,64 @@ services:
       resources:
         limits:
           memory: 320M
+
+  # -------------------------------------------------------------------------
+  # Caddy — the only container that publishes a port (ADR-0005).
+  #
+  # Terminates TLS, applies security headers, serves the SPA baked into its own
+  # image, and proxies exactly two things: /api to the API, and /img to
+  # SearXNG's image proxy.
+  #
+  # It joins `backend` for that second route alone. The API cannot serve image
+  # bytes because ADR-0004 leaves it without an internet route, so the fetch has
+  # to happen in the one container that has one. Only /image_proxy is exposed;
+  # SearXNG's search, config, and stats endpoints stay unreachable, which is
+  # what keeps `limiter: false` safe (SF-004).
+  # -------------------------------------------------------------------------
+  caddy:
+    build:
+      context: .
+      dockerfile: infra/caddy/Dockerfile
+    image: veilix-web:local
+    container_name: veilix-caddy
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - edge
+      - backend
+    ports:
+      - "${VEILIX_HTTP_PORT:-8088}:8080"
+    environment:
+      # ":8080" means "any host, plain HTTP" and is the local default.
+      # Setting a real hostname (search.example.com) makes Caddy request a
+      # Let's Encrypt certificate, which needs public DNS and ports 80/443.
+      #
+      # The default is written ":-:8080" — a Compose default of ":8080" — and
+      # not Caddy's own "::8080" default syntax, which Compose would try to
+      # interpolate and reject.
+      VEILIX_SITE_ADDRESS: "${VEILIX_SITE_ADDRESS:-:8080}"
+      VEILIX_ACME_EMAIL: "${VEILIX_ACME_EMAIL:-}"
+    volumes:
+      # Certificates and ACME account keys. Named volumes, not bind mounts:
+      # this tree is inside a OneDrive sync root, and syncing private keys to
+      # a cloud folder is not a thing to do by accident.
+      - caddy_data:/data
+      - caddy_config:/config
+    <<: *default-hardening
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "-T", "5", "http://127.0.0.1:8080/"]
+      interval: 15s
+      timeout: 6s
+      retries: 5
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+volumes:
+  caddy_data:
+  caddy_config:

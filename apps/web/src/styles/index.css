@@ -1,0 +1,162 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+   Veilix design tokens.
+
+   The interface is deliberately not a Google pastiche. The organising idea is
+   a *quiet instrument*: near-monochrome, generous whitespace, one restrained
+   accent, and typography doing the work that colour usually does. Search is a
+   reading task, so the result list is tuned for scanning long lists of text
+   rather than for looking impressive in a screenshot.
+
+   Colours are OKLCH so that lightness is perceptually even across hues — a
+   50% grey and a 50% teal read as the same weight, which is what keeps the
+   dark theme from looking muddy when it is derived from the same scale.
+--------------------------------------------------------------------------- */
+
+@theme {
+  /* Ink — near-black with a trace of blue, warmer and less harsh than #000 */
+  --color-ink-50:  oklch(98.5% 0.002 250);
+  --color-ink-100: oklch(96.5% 0.003 250);
+  --color-ink-200: oklch(92%   0.004 250);
+  --color-ink-300: oklch(85%   0.006 250);
+  --color-ink-400: oklch(68%   0.008 250);
+  --color-ink-500: oklch(55%   0.010 250);
+  --color-ink-600: oklch(44%   0.012 250);
+  --color-ink-700: oklch(33%   0.014 250);
+  --color-ink-800: oklch(23%   0.014 250);
+  --color-ink-900: oklch(16%   0.012 250);
+  --color-ink-950: oklch(11%   0.010 250);
+
+  /* Veil — the single accent. Teal reads as calm and trustworthy without the
+     corporate-blue association every other search product uses. */
+  --color-veil-300: oklch(82% 0.09  195);
+  --color-veil-400: oklch(74% 0.115 195);
+  --color-veil-500: oklch(66% 0.130 195);
+  --color-veil-600: oklch(56% 0.120 195);
+  --color-veil-700: oklch(46% 0.100 195);
+
+  /* Amber — used only for "degraded", never decoratively. If this colour is
+     on screen, something is genuinely partially broken. */
+  --color-warn-400: oklch(78% 0.130 75);
+  --color-warn-600: oklch(58% 0.130 75);
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+               "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+
+  /* A modest scale. Search UI needs few sizes; more would add noise. */
+  --text-2xs: 0.6875rem;
+
+  --radius-card: 0.75rem;
+}
+
+/* ---------------------------------------------------------------------------
+   Semantic surface variables.
+
+   Components reference these rather than palette steps directly, so the dark
+   theme is one block of overrides instead of `dark:` on every element.
+--------------------------------------------------------------------------- */
+
+:root {
+  --surface:        var(--color-ink-50);
+  --surface-raised: #ffffff;
+  --surface-sunken: var(--color-ink-100);
+  --border-subtle:  var(--color-ink-200);
+  --border-strong:  var(--color-ink-300);
+  --text-primary:   var(--color-ink-900);
+  --text-secondary: var(--color-ink-600);
+  --text-muted:     var(--color-ink-500);
+  --accent:         var(--color-veil-700);
+  --accent-hover:   var(--color-veil-600);
+  --focus-ring:     var(--color-veil-600);
+  --warn-text:      var(--color-warn-600);
+}
+
+.dark {
+  --surface:        var(--color-ink-950);
+  --surface-raised: var(--color-ink-900);
+  --surface-sunken: oklch(9% 0.010 250);
+  --border-subtle:  var(--color-ink-800);
+  --border-strong:  var(--color-ink-700);
+  --text-primary:   var(--color-ink-100);
+  --text-secondary: var(--color-ink-300);
+  --text-muted:     var(--color-ink-400);
+  --accent:         var(--color-veil-400);
+  --accent-hover:   var(--color-veil-300);
+  --focus-ring:     var(--color-veil-400);
+  --warn-text:      var(--color-warn-400);
+}
+
+/* ---------------------------------------------------------------------------
+   Base
+--------------------------------------------------------------------------- */
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--surface);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* One visible focus style everywhere, using :focus-visible so it appears for
+     keyboard users without following every mouse click. Removing focus rings
+     is the single most common way a site becomes unusable without a mouse. */
+  :focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+    border-radius: 3px;
+  }
+
+  /* Respect a stated preference for less motion. This is an accessibility
+     requirement, not a nicety: motion triggers nausea and migraine for some
+     people. */
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  ::selection {
+    background-color: color-mix(in oklch, var(--accent) 25%, transparent);
+  }
+}
+
+@layer components {
+  /* Skip link — the first tab stop on every page, so a keyboard user can jump
+     past the header instead of tabbing through it on every navigation. */
+  .skip-link {
+    position: absolute;
+    left: -9999px;
+    z-index: 100;
+    padding: 0.75rem 1.25rem;
+    background-color: var(--surface-raised);
+    color: var(--text-primary);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-card);
+    font-weight: 500;
+  }
+  .skip-link:focus {
+    left: 1rem;
+    top: 1rem;
+  }
+}
+
+/* Thin scrollbars that follow the theme rather than punching a light-grey
+   stripe through a dark page. */
+@supports (scrollbar-width: thin) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+  }
+}

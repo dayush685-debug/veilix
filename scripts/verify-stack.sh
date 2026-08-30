@@ -51,20 +51,31 @@ fi
 head_ "Exposure surface (SF-004)"
 # ---------------------------------------------------------------------------
 
-# The production compose file alone must publish nothing. limiter:false is only
-# safe while this holds; see docs/security-findings.md SF-004.
-PORTS=$(docker compose -f docker-compose.yml config --format json 2>/dev/null |
+# Caddy is the ONLY service allowed to publish a host port. SearXNG in
+# particular must publish none: its JSON API is enabled and its own bot
+# limiter is off, so exposing it would create an open, unauthenticated,
+# abusable search API (SF-004).
+docker compose -f docker-compose.yml config --format json 2>/dev/null |
   python -c "
 import json,sys
+G,R,Y='[32m','[31m','[0m'
 d=json.load(sys.stdin)
-print(sum(len(s.get('ports') or []) for s in d['services'].values()))
-" 2>/dev/null)
-
-if [ "${PORTS:-x}" = "0" ]; then
-  ok  "production compose publishes no host ports"
-else
-  bad "production compose publishes ${PORTS} port(s) — SearXNG must never be exposed with limiter:false"
-fi
+ALLOWED={'caddy'}
+rc=0
+for name,svc in sorted(d['services'].items()):
+    ports=svc.get('ports') or []
+    if ports and name not in ALLOWED:
+        print(f'  {R}FAIL{Y}  {name} publishes {len(ports)} host port(s) - only the edge may be exposed')
+        rc=1
+    elif not ports and name not in ALLOWED:
+        print(f'  {G}PASS{Y}  {name} publishes no host ports')
+    elif ports:
+        print(f'  {G}PASS{Y}  {name} is the edge and publishes {len(ports)} port(s)')
+    else:
+        print(f'  {R}FAIL{Y}  {name} is the edge but publishes nothing')
+        rc=1
+sys.exit(rc)
+" || bad "port exposure does not match the intended topology"
 
 # ---------------------------------------------------------------------------
 head_ "Container hardening"
@@ -253,6 +264,71 @@ if unexpected:
     sys.exit(1)
 print(f'  {G}PASS{Y}  all {len(names)} metric labels are on the approved list')
 " || bad "metrics carry unapproved labels"
+fi
+
+# ---------------------------------------------------------------------------
+head_ "Edge (Caddy)"
+# ---------------------------------------------------------------------------
+
+EDGE_URL="${EDGE_URL:-http://127.0.0.1:8088}"
+
+if ! curl -sf -m 10 "${EDGE_URL}/" >/dev/null 2>&1; then
+  printf '  [33mSKIP[0m  %s unreachable - start the caddy service
+' "${EDGE_URL}"
+else
+  ok "SPA is served"
+
+  # Deep links must return the app shell, not a 404, or a shared search URL
+  # breaks on first load.
+  CODE=$(curl -s -o /dev/null -w '%{http_code}' -m 15 "${EDGE_URL}/search?q=x")
+  [ "${CODE}" = "200" ] && ok "deep links fall back to the SPA shell"                         || bad "deep link returned ${CODE}, expected 200"
+
+  # Security headers.
+  HEADERS=$(curl -sI -m 15 "${EDGE_URL}/")
+  for h in "Content-Security-Policy" "X-Frame-Options" "X-Content-Type-Options"            "Referrer-Policy" "Permissions-Policy" "Strict-Transport-Security"; do
+    echo "${HEADERS}" | grep -qi "^${h}:" && ok "${h} present"                                          || bad "${h} missing"
+  done
+
+  echo "${HEADERS}" | grep -qi "^Server:" && bad "Server header advertises the software"                                           || ok "Server header removed"
+
+  # The CSP must forbid third-party images outright. That is only possible
+  # because every thumbnail is proxied through this origin.
+  if echo "${HEADERS}" | grep -qi "img-src 'self' data:"; then
+    ok "CSP forbids third-party image hosts"
+  else
+    bad "CSP img-src allows hosts other than 'self'"
+  fi
+
+  # SearXNG must NOT be reachable through the edge. Status alone cannot tell:
+  # the SPA fallback also answers 200, so the body decides.
+  LEAKED=0
+  for p in "/search?q=x&format=json" "/config" "/stats"; do
+    if ! curl -s -m 15 "${EDGE_URL}${p}" | head -c 200 | grep -q "<!doctype html>"; then
+      bad "SearXNG content leaked through the edge at ${p}"
+      LEAKED=1
+    fi
+  done
+  [ "${LEAKED}" = "0" ] && ok "SearXNG is not reachable through the edge"
+
+  # The image proxy must refuse unsigned URLs, or it becomes an open proxy.
+  CODE=$(curl -s -o /dev/null -w '%{http_code}' -m 20 "${EDGE_URL}/img?url=https://example.com/x.jpg")
+  [ "${CODE}" = "400" ] && ok "image proxy rejects unsigned URLs (400)"                         || bad "unsigned image proxy request returned ${CODE}, expected 400"
+
+  # Access logs must carry no client address (docs/privacy.md section 4).
+  if docker logs veilix-caddy 2>&1 | grep "handled request" | tail -20 |
+     grep -qE '"[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}"'; then
+    bad "edge access logs contain client IP addresses"
+  else
+    ok "edge access logs carry no client addresses"
+  fi
+
+  # The inline theme script must match the hash the CSP allows, or the browser
+  # silently refuses to run it and dark-mode users get a white flash.
+  if bash "$(dirname "$0")/check-csp-hash.sh" >/dev/null 2>&1; then
+    ok "CSP hash matches the inline theme script"
+  else
+    bad "CSP hash does not match apps/web/index.html - run scripts/check-csp-hash.sh"
+  fi
 fi
 
 # ---------------------------------------------------------------------------

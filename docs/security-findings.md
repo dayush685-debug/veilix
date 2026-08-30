@@ -128,7 +128,7 @@ The planned test must account for this file being development-only.
 
 - **Found**: Phase 2, reviewing the JSON result schema
 - **Severity**: Medium
-- **Status**: PARTIALLY MITIGATED — API layer done in Phase 3, frontend and CSP pending
+- **Status**: MITIGATED — all three layers in place as of Phase 4
 
 Every field in a search result — `url`, `title`, `content`, `img_src`, `iframe_src` — is
 authored by a third party and reaches the user's browser through us. Anyone able to rank
@@ -144,10 +144,84 @@ embedded third-party frames.
   URL-bearing field, and `providers/searxng.py` drops any result that fails. Covered by
   unit tests over `javascript:`, `data:`, `vbscript:`, `file:`, and `about:` URLs, and by
   an HTTP-level test asserting such results never reach a client.
-- **Frontend (Phase 4) — pending.** Render all result text as text nodes, never as HTML;
-  no `dangerouslySetInnerHTML` anywhere in the result path.
-- **Caddy (Phase 5) — pending.** A Content-Security-Policy that would contain a failure
-  at either layer.
+- **Frontend (Phase 4) — DONE.** All result text renders as React children, which escapes
+  it. There is no `dangerouslySetInnerHTML` anywhere in the codebase. Component tests feed
+  `<img src=x onerror=...>` and `<script>` payloads through a result card and assert they
+  appear as visible text with no corresponding DOM node.
+- **Caddy (Phase 4) — DONE.** A Content-Security-Policy with `script-src 'self'` plus a
+  single SHA-256 hash for the inline theme snippet, `object-src 'none'`, and
+  `base-uri 'none'`. An injected inline script is refused even if it reached the DOM.
 
 Three independent layers, because this is the most likely place for a mistake to reach a
 real user.
+
+---
+
+## SF-006 — `cap_drop: ALL` broke Caddy's exec via file capabilities
+
+- **Found**: Phase 4, first edge bring-up
+- **Severity**: Low (availability, not confidentiality)
+- **Status**: FIXED in Phase 4
+
+The Caddy container crash-looped with `exec /usr/bin/caddy: operation not permitted`. The
+image ships the binary with `cap_net_bind_service` as a *file capability* so it can bind
+port 80 unprivileged, and the kernel refuses to exec a binary whose permitted capability
+set is not within the container's bounding set — which `cap_drop: ALL` empties.
+
+Same root cause family as SF-002, different mechanism: that one was `setpriv` needing
+`CAP_SETUID` at runtime, this one is file capabilities checked at exec time.
+
+**Fix applied**: strip the capability from the binary at build time
+(`setcap -r /usr/bin/caddy`) rather than granting it back. Caddy listens on 8080 inside
+the container and Docker publishes the privileged port to it, so the capability was never
+needed — and removing it means this binary cannot bind a privileged port at all, even if
+something later tries.
+
+---
+
+## SF-007 — Caddy appends to `X-Forwarded-For`; the API reads the first entry
+
+- **Found**: Phase 4, reviewing the proxy configuration
+- **Severity**: **High** if misconfigured — the rate limiter would be fully evadable
+- **Status**: FIXED and covered by an end-to-end test
+
+`core/security.client_ip_from_headers` takes the **first** entry of `X-Forwarded-For`,
+which is correct for a proxy that *replaces* the header. Caddy's `reverse_proxy` default
+is to **append** the client address to whatever the client already sent.
+
+Under the default, an attacker sending `X-Forwarded-For: 1.2.3.4` would have Caddy
+forward `1.2.3.4, <real address>`, the API would bucket them as `1.2.3.4`, and rotating
+that value per request would give every request its own rate-limit bucket. The limiter
+would keep running, keep emitting metrics, and limit nothing — the failure is completely
+invisible from the outside.
+
+**Fix**: `header_up X-Forwarded-For {remote_host}` in the `/api/*` handler, which *sets*
+the header and discards whatever the client sent.
+
+**Caddy warns that this directive is "unnecessary".** The warning is misleading, and
+following it would reintroduce the vulnerability. The Caddyfile records this inline so
+nobody removes the line to silence the log.
+
+**Verified end to end**: ten requests through the proxy, each carrying a different forged
+`X-Forwarded-For`, against a limit of five, produced `200 200 200 200 200 429 429 429 429
+429`. The forged values never reached the limiter.
+
+---
+
+## SF-008 — Caddy access logs recorded client IP addresses
+
+- **Found**: Phase 4, reading real log output
+- **Severity**: Medium (privacy)
+- **Status**: FIXED in Phase 4
+
+The access-log filter deleted `request>remote_ip`, which is what Caddy 1 called the field.
+Caddy 2 emits it as `client_ip`, so every access-log line contained the visitor's address
+— directly contradicting `docs/privacy.md` §4, while the configuration looked correct.
+
+**Fix**: delete `request>client_ip` (and `request>host`) as well. The remaining log line
+carries only protocol, method, duration, size, and status.
+
+**Worth noting how this was found**: not by reading the configuration, which looked right,
+but by reading the output it produced. `scripts/verify-stack.sh` now greps recent access
+logs for anything shaped like an IP address, so a future field rename fails a check
+instead of silently reinstating the leak.

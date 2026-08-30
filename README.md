@@ -6,11 +6,12 @@ A privacy-first, self-hostable meta-search platform built around
 It aggregates results from many search engines without accounts, without cookies, without
 search history, and without building a profile of the person asking.
 
-> **Build status: Phase 3 of 10 complete.** SearXNG, Valkey, and the FastAPI backend
-> run as four hardened containers. 151 tests pass, mypy runs strict and clean, and
-> `scripts/verify-stack.sh` asserts 18 architectural claims against the running stack.
-> The frontend lands in Phase 4. This README is filled out as each phase completes, and
-> no capability is described here before it exists.
+> **Build status: Phase 4 of 10 complete.** The full stack runs as four hardened
+> containers behind Caddy. 168 tests pass (151 backend, 17 frontend), mypy runs strict
+> and clean, ESLint is clean with type-aware rules, and `scripts/verify-stack.sh` asserts
+> **31 architectural and security claims** against the running stack. This README is
+> filled out as each phase completes, and no capability is described here before it
+> exists.
 
 ## Why this exists
 
@@ -45,9 +46,10 @@ the reliability story, and it is measured rather than imagined.
 ## Architecture at a glance
 
 ```
-Browser → Caddy (TLS, headers, serves SPA) → FastAPI (validate, limit, orchestrate)
-                                                 ├→ Valkey  (cache, rate-limit counters)
-                                                 └→ SearXNG (→ 272 upstream engines)
+Browser → Caddy (TLS, CSP, serves the SPA) ─┬→ FastAPI (validate, limit, orchestrate)
+                                            │      ├→ Valkey  (cache, rate-limit counters)
+                                            │      └→ SearXNG (→ 272 upstream engines)
+                                            └→ /img → SearXNG image proxy
 ```
 
 Three Docker networks. The `backend` network is `internal: true`, so the API container
@@ -62,6 +64,7 @@ Full detail in **[docs/architecture.md](docs/architecture.md)**.
 | [docs/architecture.md](docs/architecture.md) | Topology, request flow, technology decisions, verified SearXNG facts |
 | [docs/privacy.md](docs/privacy.md) | Complete data inventory, retention, and what the operator can still observe |
 | [docs/api.md](docs/api.md) | API reference, and the two behaviours that will surprise a client |
+| [docs/security-findings.md](docs/security-findings.md) | Every security finding, open and fixed, with evidence |
 | [docs/adr/](docs/adr/) | Architecture decision records, including what was rejected and why |
 | [docs/security-findings.md](docs/security-findings.md) | Running register of security findings, open and fixed |
 

@@ -1,0 +1,186 @@
+# Veilix edge configuration.
+#
+# Caddy is the only container that publishes a port. It terminates TLS, applies
+# security headers, serves the built SPA, and proxies the two paths that need a
+# backend. Everything else in the stack is unreachable from outside.
+
+{
+	# No global `email` directive.
+	#
+	# Let's Encrypt accepts accounts without one, and an empty
+	# `email {$VAR:}` expansion is a hard parse error that stops Caddy from
+	# starting at all — a broken deployment in exchange for an optional field.
+	# An operator who wants expiry notifications should add `email you@example.com`
+	# here; see docs/deployment.md.
+
+	# Caddy's own admin API. Disabled: it can rewrite this configuration at
+	# runtime, so leaving it listening inside the container is a privilege
+	# escalation path that buys us nothing — config here is immutable by design.
+	admin off
+
+	servers {
+		# Do not advertise the server software in responses.
+		protocols h1 h2 h3
+	}
+}
+
+# ---------------------------------------------------------------------------
+# Snippets
+# ---------------------------------------------------------------------------
+
+(security_headers) {
+	header {
+		# HSTS. Only meaningful over real TLS; harmless on localhost.
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+
+		# Content Security Policy.
+		#
+		# `img-src 'self' data:` — no third-party image host is permitted at
+		# all. That is only possible because every thumbnail is proxied through
+		# this origin (docs/privacy.md §6), so the privacy decision and this
+		# security control reinforce each other: if image proxying ever broke,
+		# the CSP would visibly break the page rather than silently leak.
+		#
+		# The script hash covers the theme-selection snippet inlined in
+		# index.html, which must run before first paint to avoid a white flash.
+		# A hash rather than 'unsafe-inline' means that snippet is the *only*
+		# inline script that can run — an injected one is refused.
+		# scripts/check-csp-hash.sh fails CI if the two drift apart.
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-hDIE5L8c2QNo5bnj6EbPg48FXSZGtpPRxpx+GhR1WPE='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'; upgrade-insecure-requests"
+
+		# Belt-and-braces with frame-ancestors above, for older agents.
+		X-Frame-Options "DENY"
+		X-Content-Type-Options "nosniff"
+
+		# Never tell a destination site that Veilix sent the visitor.
+		Referrer-Policy "no-referrer"
+
+		# Deny sensors and APIs this application has no use for, so a
+		# compromised script cannot reach for them either.
+		Permissions-Policy "accelerometer=(), autoplay=(), camera=(), display-capture=(), encrypted-media=(), fullscreen=(self), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), usb=()"
+
+		# Search results are user-visible content from third parties; keep this
+		# origin out of anyone's crawl index.
+		X-Robots-Tag "noindex, nofollow"
+
+		# Remove the header that advertises what to attack.
+		-Server
+	}
+}
+
+(compression) {
+	encode zstd gzip
+}
+
+# ---------------------------------------------------------------------------
+# Site
+#
+# The address comes from VEILIX_DOMAIN. `localhost` makes Caddy serve plain
+# HTTP with no certificate request; any real hostname triggers automatic
+# Let's Encrypt issuance, which needs public DNS and reachable ports 80/443.
+# ---------------------------------------------------------------------------
+
+{$VEILIX_SITE_ADDRESS::8080} {
+	import security_headers
+	import compression
+
+	log {
+		output stdout
+		format json
+		# The query string carries the user's search terms, so the default
+		# access log would be a permanent record of everything anyone looked
+		# for — exactly what docs/privacy.md §4 forbids. Only the method,
+		# status, and duration are kept.
+		format filter {
+			wrap json
+			fields {
+				request>uri delete
+				request>headers delete
+				request>remote_ip delete
+				# Caddy 2 renamed remote_ip to client_ip in the access log.
+				# Deleting only the old name leaves a client address in every
+				# log line. Found by reading real output, not the config.
+				request>client_ip delete
+				request>host delete
+				request>remote_port delete
+				resp_headers delete
+			}
+		}
+	}
+
+	# --- API ---------------------------------------------------------------
+	handle /api/* {
+		reverse_proxy api:8000 {
+			# SETTING X-Forwarded-For here is load-bearing, and Caddy will warn
+			# that it is "unnecessary". The warning is misleading.
+			#
+			# Caddy's default is to APPEND the client address to whatever the
+			# client already sent. The API reads the FIRST entry, which is
+			# correct for a proxy that replaces the header and catastrophic
+			# for one that appends: an attacker sending
+			#     X-Forwarded-For: 1.2.3.4
+			# would have the API bucket them as 1.2.3.4, pick a fresh value per
+			# request, and never be limited — while the limiter kept reporting
+			# perfectly healthy numbers.
+			#
+			# header_up SETS the header, discarding what the client sent.
+			# Verified end to end: 10 requests through this proxy, each with a
+			# different forged X-Forwarded-For, against a limit of 5, produced
+			# 5x200 then 5x429. Do not remove this to silence the warning.
+			header_up X-Forwarded-For {remote_host}
+			header_up X-Real-IP {remote_host}
+		}
+	}
+
+	# Generated API documentation, served from the same origin.
+	handle /openapi.json {
+		reverse_proxy api:8000
+	}
+	handle /redoc* {
+		reverse_proxy api:8000
+	}
+
+	# --- Image proxy -------------------------------------------------------
+	#
+	# The single path where Caddy talks to SearXNG directly, and a deliberate
+	# widening of ADR-0004's topology. The API cannot serve these bytes itself
+	# because it has no internet route by design, so the fetch has to happen in
+	# the one container that does.
+	#
+	# Only /image_proxy is exposed. SearXNG's search, config and stats
+	# endpoints remain unreachable from outside, which is what keeps the
+	# `limiter: false` decision safe (SF-004).
+	handle /img* {
+		# URLs are HMAC-signed by the API; SearXNG rejects anything unsigned
+		# with a 400, so this endpoint cannot be used to fetch arbitrary URLs
+		# by anyone who does not hold the secret.
+		rewrite * /image_proxy?{query}
+		reverse_proxy searxng:8080
+
+		header {
+			# Proxied images are immutable for their URL: the signature covers
+			# the source URL, so a changed image means a changed URL.
+			Cache-Control "public, max-age=86400, immutable"
+			# Defence in depth if a non-image ever slips through upstream's
+			# content-type check.
+			X-Content-Type-Options "nosniff"
+		}
+	}
+
+	# --- Static SPA --------------------------------------------------------
+	handle {
+		root * /srv
+
+		# Hashed asset filenames are content-addressed, so they can be cached
+		# hard. index.html must not be, or a deploy leaves clients pinned to a
+		# stale bundle that references assets which no longer exist.
+		@immutable path /assets/*
+		header @immutable Cache-Control "public, max-age=31536000, immutable"
+		header /index.html Cache-Control "no-cache"
+
+		# Client-side routing: unknown paths return the SPA shell rather than a
+		# 404, so a deep link to /search?q=… works on first load.
+		try_files {path} /index.html
+		file_server
+	}
+}

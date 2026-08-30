@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Veilix — private search</title>
+    <meta name="description" content="A privacy-first meta-search engine. No accounts, no cookies, no search history, no profiling." />
+    <meta name="color-scheme" content="light dark" />
+    <!-- No third-party fonts, analytics, or trackers. The page loads nothing
+         from a host the user did not choose. -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>◈</text></svg>" />
+    <script>
+      // Applied before first paint so a dark-mode user never sees a white flash.
+      (function () {
+        try {
+          var t = localStorage.getItem('veilix.theme');
+          var dark = t === 'dark' || (!t && matchMedia('(prefers-color-scheme: dark)').matches);
+          if (dark) document.documentElement.classList.add('dark');
+        } catch (e) { /* private mode: fall back to the media query in CSS */ }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
