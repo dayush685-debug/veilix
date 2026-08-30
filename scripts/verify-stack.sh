@@ -117,13 +117,26 @@ head_ "Search functionality"
 if ! curl -sf -m 10 "${SEARXNG_DEV_URL}/healthz" >/dev/null 2>&1; then
   printf '  \033[33mSKIP\033[0m  %s unreachable — bring the stack up with docker-compose.dev.yml\n' "${SEARXNG_DEV_URL}"
 else
+  # Retried once before failing.
+  #
+  # Not flakiness-hiding: upstream engines suspend themselves under load
+  # (CAPTCHA -> 3600s, rate limit -> 180s), so running this script repeatedly
+  # can genuinely exhaust every engine in a category for a few minutes. That is
+  # the behaviour the whole architecture is designed around, and it should not
+  # be reported as a broken stack. A category that returns nothing twice in a
+  # row is a real problem worth failing on.
   for cat in general news images it science; do
-    n=$(curl -s -m 40 "${SEARXNG_DEV_URL}/search?q=test&categories=${cat}&format=json" |
-        python -c "import json,sys;print(len(json.load(sys.stdin).get('results',[])))" 2>/dev/null)
+    n=0
+    for attempt in 1 2; do
+      n=$(curl -s -m 40 "${SEARXNG_DEV_URL}/search?q=test&categories=${cat}&format=json" |
+          python -c "import json,sys;print(len(json.load(sys.stdin).get('results',[])))" 2>/dev/null)
+      [ "${n:-0}" -gt 0 ] 2>/dev/null && break
+      [ "${attempt}" = "1" ] && sleep 4
+    done
     if [ "${n:-0}" -gt 0 ] 2>/dev/null; then
       ok  "category '${cat}' returned ${n} results"
     else
-      bad "category '${cat}' returned no results"
+      bad "category '${cat}' returned no results on two attempts"
     fi
   done
 
@@ -153,6 +166,93 @@ for n in ('bt4g', 'kickass', 'piratebay', 'solidtorrents'):
 print(f\"  {G}INFO{Y}  instance_name={d['instance_name']!r} safe_search={d['safe_search']} limiter={d['limiter']['enabled']}\")
 sys.exit(rc)
 " || bad "engine curation does not match infra/searxng/settings.yml"
+fi
+
+# ---------------------------------------------------------------------------
+head_ "Veilix API"
+# ---------------------------------------------------------------------------
+
+API_URL="${API_URL:-http://127.0.0.1:18000}"
+
+if ! curl -sf -m 10 "${API_URL}/api/v1/live" >/dev/null 2>&1; then
+  printf '  [33mSKIP[0m  %s unreachable - start the api service
+' "${API_URL}"
+else
+  ok "liveness responds"
+
+  # Version 0.0.0 means the Dockerfile shipped the dependency-cache stub
+  # instead of the real package - a failure that otherwise looks like success.
+  VER=$(curl -s -m 10 "${API_URL}/api/v1/health" | python -c "import json,sys;print(json.load(sys.stdin).get('version','?'))" 2>/dev/null)
+  if [ "${VER}" = "0.0.0" ] || [ -z "${VER}" ]; then
+    bad "api reports version '${VER}' - the build shipped the stub package"
+  else
+    ok "api reports a real version (${VER})"
+  fi
+
+  # Unknown query parameters must 422 rather than being silently ignored,
+  # or a typo like safe_search= would quietly give the wrong filtering.
+  CODE=$(curl -s -o /dev/null -w '%{http_code}' -m 15 "${API_URL}/api/v1/search?q=x&safe_search=2")
+  if [ "${CODE}" = "422" ]; then
+    ok "unknown query parameters are rejected (422)"
+  else
+    bad "unknown query parameter returned ${CODE}, expected 422"
+  fi
+
+  # Every error must be RFC 9457 problem+json, validation failures included.
+  CT=$(curl -s -o /dev/null -w '%{content_type}' -m 15 "${API_URL}/api/v1/search?q=x&bogus=1")
+  case "${CT}" in
+    application/problem+json*) ok "errors use problem+json" ;;
+    *) bad "error content-type was '${CT}', expected application/problem+json" ;;
+  esac
+
+  # The privacy claim in docs/privacy.md section 6: no third-party image host
+  # may appear in a response, or rendering the page leaks the viewer's IP.
+  curl -s -m 60 "${API_URL}/api/v1/search?q=mountain&category=images" | python -c "
+import json,sys
+G,R,Y='[32m','[31m','[0m'
+try: d=json.load(sys.stdin)
+except Exception: print(f'  {R}FAIL{Y}  image search returned no parseable body'); sys.exit(1)
+imgs=[r['media']['image_url'] for r in d.get('results',[]) if r.get('media') and r['media'].get('image_url')]
+leaks=[u for u in imgs if u.startswith('http')]
+if not imgs:
+    print(f'  {R}FAIL{Y}  no image results carried a proxied url'); sys.exit(1)
+if leaks:
+    print(f'  {R}FAIL{Y}  {len(leaks)} of {len(imgs)} image urls point at third-party hosts'); sys.exit(1)
+print(f'  {G}PASS{Y}  all {len(imgs)} image urls are proxied, none third-party')
+" || bad "image proxying is leaking third-party urls"
+
+  # Admin must never be open.
+  CODE=$(curl -s -o /dev/null -w '%{http_code}' -m 15 "${API_URL}/api/v1/admin/overview")
+  if [ "${CODE}" = "401" ] || [ "${CODE}" = "429" ]; then
+    ok "admin endpoint requires authentication (${CODE})"
+  else
+    bad "unauthenticated admin request returned ${CODE}, expected 401"
+  fi
+
+  # Metrics must carry no user-derived label (docs/privacy.md section 8).
+  #
+  # Checked as an ALLOWLIST of label names rather than a denylist of bad ones.
+  # A denylist only catches the leaks someone already thought of; an allowlist
+  # fails on any new label until a human approves it, which is the direction
+  # that stays correct as the code grows. It also doubles as the guard against
+  # unbounded metric cardinality, since the two problems have one cause.
+  curl -s -m 15 "${API_URL}/api/v1/metrics" | python -c "
+import sys,re
+G,R,Y='[32m','[31m','[0m'
+ALLOWED={'method','route','status_class','category','outcome','cache','engine',
+         'reason','identity','decision','dependency','to_state','version',
+         'environment','le'}
+names=set()
+for line in sys.stdin:
+    if line.startswith('#') or '{' not in line: continue
+    for m in re.finditer(r'([a-zA-Z_][a-zA-Z0-9_]*)=\"', line.split('{',1)[1]):
+        names.add(m.group(1))
+unexpected=sorted(names-ALLOWED)
+if unexpected:
+    print(f'  {R}FAIL{Y}  unapproved metric labels: {unexpected} - if user-derived this is a privacy leak, if not add it to the allowlist deliberately')
+    sys.exit(1)
+print(f'  {G}PASS{Y}  all {len(names)} metric labels are on the approved list')
+" || bad "metrics carry unapproved labels"
 fi
 
 # ---------------------------------------------------------------------------

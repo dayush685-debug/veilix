@@ -16,7 +16,20 @@ services:
       # Host 18080 avoids 8080, commonly taken by other local projects.
       - "127.0.0.1:18080:8080"
 
-  valkey:
+  # Valkey deliberately publishes NO port, even here.
+  #
+  # It cannot: it sits only on `backend`, which is internal:true and therefore
+  # has no NAT path, so a `ports:` entry would be silently inert. Measured —
+  # the mapping was declared and the port never opened.
+  #
+  # That is the isolation doing its job, and it has a design consequence worth
+  # stating: the API cannot be usefully run on the host against a containerised
+  # Valkey. Development runs the API as a container on `backend` (below), which
+  # is the production shape anyway. Host-side tests use fakeredis instead of
+  # reaching for a real one.
+
+  api:
     ports:
-      # Host 16379 avoids 6379, which is frequently already bound.
-      - "127.0.0.1:16379:6379"
+      - "127.0.0.1:18000:8000"
+    environment:
+      VEILIX_LOG_LEVEL: debug

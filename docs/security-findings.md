@@ -56,7 +56,7 @@ better question is why the process was root to begin with.
 
 - **Found**: Phase 2, verifying the image-proxy privacy claim
 - **Severity**: Medium
-- **Status**: OPEN — mitigation scheduled for Phase 5
+- **Status**: PARTIALLY MITIGATED — signing guard done in Phase 3, egress policy pending
 
 SearXNG's `/image_proxy` fetches any URL accompanied by a valid
 `HMAC-SHA256(secret_key, url)` signature. Because the Veilix API holds that secret in
@@ -73,17 +73,26 @@ Upstream constrains the impact: responses must carry an `image/` or
 exfiltration of JSON metadata is blocked. What remains is **blind SSRF**: response codes
 and timing still leak whether an internal host and port are live.
 
-**Planned mitigation (Phase 5)**, in order of value:
+**Done — Phase 3.** `core/urls.is_safe_to_proxy` validates before signing: only
+`http`/`https` schemes, and any host that is a literal IP address in a private, loopback,
+link-local, reserved, multicast, or unspecified range is refused rather than signed. Unit
+tests cover the cloud metadata address, all three RFC 1918 ranges, IPv6 loopback, and IPv6
+link-local. A result carrying such an `img_src` now returns with no media rather than a
+signed URL.
 
-1. Validate before signing. Only sign `http`/`https` URLs, and reject hosts that are
-   literal IP addresses in private, loopback, link-local, or unique-local ranges.
-2. Note the limit of that check honestly: the API container has no external DNS, so it
-   cannot resolve a hostname to confirm it points somewhere public. A hostile
-   *hostname* resolving to an internal address defeats step 1. DNS-rebinding-style
-   attacks are not addressed by input validation alone.
-3. Consider constraining SearXNG's outbound network for the `image_proxy` network
-   context specifically, which is where an egress policy would actually bite.
-4. Cap proxied-image concurrency so the surface cannot be used as an amplifier.
+**The limit of that check, stated rather than implied.** It inspects the host as written.
+The API container has no external DNS — the same isolation that contains an attacker
+(ADR-0004) also prevents this function from resolving a name — so a hostile *hostname*
+that resolves to an internal address still passes. Input validation alone does not address
+DNS-rebinding-style attacks, and this layer should not be described as if it did.
+
+**Remaining — Phase 5:**
+
+1. Constrain SearXNG's outbound network for the `image_proxy` network context
+   specifically, which is where an egress policy would actually bite. This is the step
+   that closes the hostname gap; the Phase 3 work narrows the surface but does not close
+   it.
+2. Cap proxied-image concurrency so the surface cannot be used as a request amplifier.
 
 **Why this is written down rather than quietly fixed later**: the privacy documentation
 makes a claim about image proxying protecting users, and this is the cost of that
@@ -119,7 +128,7 @@ The planned test must account for this file being development-only.
 
 - **Found**: Phase 2, reviewing the JSON result schema
 - **Severity**: Medium
-- **Status**: OPEN — Phases 3 and 4
+- **Status**: PARTIALLY MITIGATED — API layer done in Phase 3, frontend and CSP pending
 
 Every field in a search result — `url`, `title`, `content`, `img_src`, `iframe_src` — is
 authored by a third party and reaches the user's browser through us. Anyone able to rank
@@ -129,13 +138,16 @@ Concrete risks: `javascript:` or `data:` URLs in the `url` field becoming clicka
 HTML in `title` or `content` reaching the DOM unescaped; `iframe_src` values causing
 embedded third-party frames.
 
-**Planned handling**:
+**Handling**:
 
-- API layer (Phase 3): allowlist URL schemes to `http` and `https` on every URL-bearing
-  field, and drop results that fail.
-- Frontend (Phase 4): render all result text as text nodes, never as HTML; no
-  `dangerouslySetInnerHTML` anywhere in the result path.
-- Caddy (Phase 5): a Content-Security-Policy that would contain a failure at either layer.
+- **API layer (Phase 3) — DONE.** `core/urls.py` allowlists `http` and `https` on every
+  URL-bearing field, and `providers/searxng.py` drops any result that fails. Covered by
+  unit tests over `javascript:`, `data:`, `vbscript:`, `file:`, and `about:` URLs, and by
+  an HTTP-level test asserting such results never reach a client.
+- **Frontend (Phase 4) — pending.** Render all result text as text nodes, never as HTML;
+  no `dangerouslySetInnerHTML` anywhere in the result path.
+- **Caddy (Phase 5) — pending.** A Content-Security-Policy that would contain a failure
+  at either layer.
 
 Three independent layers, because this is the most likely place for a mistake to reach a
 real user.

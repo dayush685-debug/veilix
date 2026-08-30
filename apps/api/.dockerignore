@@ -1,0 +1,22 @@
+# Build context hygiene: a smaller context is a faster build, and anything
+# excluded here cannot be baked into a layer by accident.
+**/__pycache__
+**/*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+coverage.xml
+tests/
+*.md
+!README.md
+
+# Never into an image, even though these are gitignored too. Secrets copied
+# into a layer survive in the image history even if a later layer deletes them.
+.env
+.env.*
+*.pem
+*.key

@@ -1,0 +1,121 @@
+[project]
+name = "veilix-api"
+version = "0.1.0"
+description = "Privacy-first meta-search API over SearXNG"
+requires-python = ">=3.12"
+
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    # http2 extra: SearXNG speaks HTTP/2, and connection reuse matters on a
+    # fan-out workload.
+    "httpx[http2]>=0.27",
+    # Valkey is wire-compatible with the Redis protocol. redis-py is the more
+    # mature async client and speaks to Valkey unchanged; see ADR-0002 notes.
+    "redis>=5.2",
+    "structlog>=24.4",
+    "prometheus-client>=0.21",
+    # Argon2 is for the human-chosen admin password only. API keys are
+    # high-entropy random and use SHA-256 — see core/security.py.
+    "argon2-cffi>=23.1",
+    "orjson>=3.10",
+]
+
+[project.optional-dependencies]
+otel = [
+    "opentelemetry-sdk>=1.28",
+    "opentelemetry-instrumentation-fastapi>=0.49b0",
+    "opentelemetry-instrumentation-httpx>=0.49b0",
+    "opentelemetry-exporter-otlp-proto-http>=1.28",
+]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=6.0",
+    "respx>=0.21",
+    # [lua] pulls in lupa. Without it fakeredis cannot EVAL, and the rate
+    # limiter's Lua script silently takes its fail-open path in every test —
+    # so the limiter tests would pass while asserting nothing about limiting.
+    "fakeredis[lua]>=2.26",
+    "ruff>=0.8",
+    "mypy>=1.13",
+]
+
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+# ---------------------------------------------------------------------------
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",   # pycodestyle
+    "F",        # pyflakes
+    "I",        # import sorting
+    "B",        # bugbear
+    "UP",       # pyupgrade
+    "S",        # bandit — security lint
+    "ASYNC",    # async correctness
+    "C4",       # comprehensions
+    "RET",      # return simplification
+    "SIM",      # simplify
+    "TID",      # tidy imports
+]
+ignore = [
+    "S104",  # binding 0.0.0.0 is correct inside a container
+    "B008",  # FastAPI's Depends() in defaults is the documented idiom
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests legitimately assert, use fixed secrets, and hit localhost.
+"tests/**" = ["S101", "S105", "S106", "S311"]
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+# ---------------------------------------------------------------------------
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+plugins = []
+mypy_path = "src"
+packages = ["veilix"]
+
+[[tool.mypy.overrides]]
+module = ["fakeredis.*", "respx.*"]
+ignore_missing_imports = true
+
+# ---------------------------------------------------------------------------
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "-q --strict-markers"
+markers = [
+    "integration: requires a running stack (docker compose up)",
+]
+
+[tool.coverage.run]
+source = ["veilix"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "@abstractmethod",
+    "\\.\\.\\.",
+]
