@@ -8,7 +8,7 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
-    // Declared explicitly rather than relying on tsconfig `paths`. The build
+    // Declared explicitly instead of relying on tsconfig `paths`. The build
     // happens to infer it; vitest does not, so the alias is stated once here
     // and both consume the same definition.
     alias: {

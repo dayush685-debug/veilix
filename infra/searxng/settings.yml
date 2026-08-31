@@ -1,4 +1,4 @@
-# Veilix — SearXNG instance configuration
+# Veilix. SearXNG instance configuration
 #
 # Written against searxng/searxng:2026.8.29-d226b78bc. Verified facts:
 #   - the WSGI server is Granian, configured via GRANIAN_* env vars (not uWSGI)
@@ -9,7 +9,7 @@
 #
 # `use_default_settings: true` means this file is a diff against upstream defaults.
 # We override deliberately and leave the other ~200 settings to upstream, so that
-# upgrades bring improvements instead of silently colliding with a stale full copy.
+# upgrades bring improvements instead of quietly colliding with a stale full copy.
 
 use_default_settings: true
 
@@ -22,7 +22,7 @@ general:
   donation_url: false
   # Per-engine aggregate timing and error counters, exposed at /stats.
   # These are engine-level aggregates with no query text and no client identity,
-  # so they are operational telemetry rather than surveillance
+  # so they are operational telemetry instead of surveillance
   # (see docs/privacy.md §8). The admin dashboard consumes them.
   enable_metrics: true
 
@@ -38,7 +38,7 @@ server:
   # shipping that value is a real vulnerability, not a formality.
   secret_key: "OVERRIDDEN_BY_SEARXNG_SECRET_ENV"
 
-  # Deliberately disabled — see ADR-0004.
+  # Disabled on purpose, see ADR-0004.
   # SearXNG's bot detection keys on client IP. Behind this architecture every
   # request arrives from one source (the api container), so the limiter would
   # treat the entire user base as a single client: it would either throttle
@@ -109,7 +109,7 @@ search:
   max_page: 10
 
   # JSON is what the Veilix API consumes. Upstream disables it by default
-  # because a public JSON endpoint is trivially abusable — which is precisely
+  # because a public JSON endpoint is trivially abusable, which is precisely
   # why this service is never published (ADR-0004).
   formats:
     - html

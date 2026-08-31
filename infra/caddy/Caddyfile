@@ -5,21 +5,14 @@
 # backend. Everything else in the stack is unreachable from outside.
 
 {
-	# No global `email` directive.
-	#
-	# Let's Encrypt accepts accounts without one, and an empty
-	# `email {$VAR:}` expansion is a hard parse error that stops Caddy from
-	# starting at all — a broken deployment in exchange for an optional field.
-	# An operator who wants expiry notifications should add `email you@example.com`
-	# here; see docs/deployment.md.
+	# No `email` directive: Let's Encrypt accepts accounts without one, and
+	# an empty `email {$VAR:}` expansion is a parse error that stops Caddy
+	# dead. Add `email you@example.com` if you want expiry notices.
 
-	# Caddy's own admin API. Disabled: it can rewrite this configuration at
-	# runtime, so leaving it listening inside the container is a privilege
-	# escalation path that buys us nothing — config here is immutable by design.
+	# The admin API can rewrite this config at runtime. Nothing needs it.
 	admin off
 
 	servers {
-		# Do not advertise the server software in responses.
 		protocols h1 h2 h3
 	}
 }
@@ -33,37 +26,27 @@
 		# HSTS. Only meaningful over real TLS; harmless on localhost.
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 
-		# Content Security Policy.
+		# img-src forbids third-party hosts outright, which only works because
+		# every thumbnail is proxied through this origin. If proxying broke, the
+		# page would visibly break instead of quietly leaking.
 		#
-		# `img-src 'self' data:` — no third-party image host is permitted at
-		# all. That is only possible because every thumbnail is proxied through
-		# this origin (docs/privacy.md §6), so the privacy decision and this
-		# security control reinforce each other: if image proxying ever broke,
-		# the CSP would visibly break the page rather than silently leak.
-		#
-		# The script hash covers the theme-selection snippet inlined in
-		# index.html, which must run before first paint to avoid a white flash.
-		# A hash rather than 'unsafe-inline' means that snippet is the *only*
-		# inline script that can run — an injected one is refused.
-		# scripts/check-csp-hash.sh fails CI if the two drift apart.
+		# The script hash covers the inline theme snippet in index.html.
+		# scripts/check-csp-hash.sh fails CI when the two drift apart.
 		Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-hDIE5L8c2QNo5bnj6EbPg48FXSZGtpPRxpx+GhR1WPE='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'; upgrade-insecure-requests"
 
-		# Belt-and-braces with frame-ancestors above, for older agents.
+		# For agents predating frame-ancestors.
 		X-Frame-Options "DENY"
 		X-Content-Type-Options "nosniff"
 
 		# Never tell a destination site that Veilix sent the visitor.
 		Referrer-Policy "no-referrer"
 
-		# Deny sensors and APIs this application has no use for, so a
-		# compromised script cannot reach for them either.
+		# Nothing here uses any of these.
 		Permissions-Policy "accelerometer=(), autoplay=(), camera=(), display-capture=(), encrypted-media=(), fullscreen=(self), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), usb=()"
 
-		# Search results are user-visible content from third parties; keep this
-		# origin out of anyone's crawl index.
+		# Third-party content; keep this origin out of crawl indexes.
 		X-Robots-Tag "noindex, nofollow"
 
-		# Remove the header that advertises what to attack.
 		-Server
 	}
 }
@@ -75,9 +58,8 @@
 # ---------------------------------------------------------------------------
 # Site
 #
-# The address comes from VEILIX_DOMAIN. `localhost` makes Caddy serve plain
-# HTTP with no certificate request; any real hostname triggers automatic
-# Let's Encrypt issuance, which needs public DNS and reachable ports 80/443.
+# VEILIX_SITE_ADDRESS. A bare port serves plain HTTP; any real hostname
+# triggers Let's Encrypt issuance, needing public DNS and ports 80/443.
 # ---------------------------------------------------------------------------
 
 {$VEILIX_SITE_ADDRESS::8080} {
@@ -87,19 +69,16 @@
 	log {
 		output stdout
 		format json
-		# The query string carries the user's search terms, so the default
-		# access log would be a permanent record of everything anyone looked
-		# for — exactly what docs/privacy.md §4 forbids. Only the method,
-		# status, and duration are kept.
+		# The default access log would be a permanent record of every query
+		# and every client address. Keep method, status, duration.
 		format filter {
 			wrap json
 			fields {
 				request>uri delete
 				request>headers delete
 				request>remote_ip delete
-				# Caddy 2 renamed remote_ip to client_ip in the access log.
-				# Deleting only the old name leaves a client address in every
-				# log line. Found by reading real output, not the config.
+				# Caddy 1 called this remote_ip; deleting only that name leaves
+				# an address on every line.
 				request>client_ip delete
 				request>host delete
 				request>remote_port delete
@@ -111,22 +90,13 @@
 	# --- API ---------------------------------------------------------------
 	handle /api/* {
 		reverse_proxy api:8000 {
-			# SETTING X-Forwarded-For here is load-bearing, and Caddy will warn
-			# that it is "unnecessary". The warning is misleading.
+			# Caddy logs a warning that these are "unnecessary". They are not.
 			#
-			# Caddy's default is to APPEND the client address to whatever the
-			# client already sent. The API reads the FIRST entry, which is
-			# correct for a proxy that replaces the header and catastrophic
-			# for one that appends: an attacker sending
-			#     X-Forwarded-For: 1.2.3.4
-			# would have the API bucket them as 1.2.3.4, pick a fresh value per
-			# request, and never be limited — while the limiter kept reporting
-			# perfectly healthy numbers.
-			#
-			# header_up SETS the header, discarding what the client sent.
-			# Verified end to end: 10 requests through this proxy, each with a
-			# different forged X-Forwarded-For, against a limit of 5, produced
-			# 5x200 then 5x429. Do not remove this to silence the warning.
+			# Its default is to APPEND the client address to whatever arrived, and
+			# the API reads the FIRST entry. Under the default an attacker sets
+			# X-Forwarded-For themselves, rotates it per request, and is never
+			# limited, while the limiter reports healthy numbers. header_up
+			# replaces the header. Do not delete this to silence the warning.
 			header_up X-Forwarded-For {remote_host}
 			header_up X-Real-IP {remote_host}
 		}
@@ -142,27 +112,21 @@
 
 	# --- Image proxy -------------------------------------------------------
 	#
-	# The single path where Caddy talks to SearXNG directly, and a deliberate
-	# widening of ADR-0004's topology. The API cannot serve these bytes itself
-	# because it has no internet route by design, so the fetch has to happen in
-	# the one container that does.
+	# The only path where Caddy reaches SearXNG. The API cannot serve these
+	# bytes because it has no internet route (ADR-0004), so the fetch happens
+	# in the container that does.
 	#
-	# Only /image_proxy is exposed. SearXNG's search, config and stats
-	# endpoints remain unreachable from outside, which is what keeps the
-	# `limiter: false` decision safe (SF-004).
+	# Exposing only /image_proxy is what keeps `limiter: false` safe: SearXNG's
+	# search, config and stats endpoints stay unreachable.
 	handle /img* {
-		# URLs are HMAC-signed by the API; SearXNG rejects anything unsigned
-		# with a 400, so this endpoint cannot be used to fetch arbitrary URLs
-		# by anyone who does not hold the secret.
+		# The API HMAC-signs these; SearXNG 400s anything unsigned.
 		rewrite * /image_proxy?{query}
 		reverse_proxy searxng:8080
 
 		header {
-			# Proxied images are immutable for their URL: the signature covers
-			# the source URL, so a changed image means a changed URL.
+			# The signature covers the source URL, so a changed image is a
+			# changed URL.
 			Cache-Control "public, max-age=86400, immutable"
-			# Defence in depth if a non-image ever slips through upstream's
-			# content-type check.
 			X-Content-Type-Options "nosniff"
 		}
 	}
@@ -171,15 +135,13 @@
 	handle {
 		root * /srv
 
-		# Hashed asset filenames are content-addressed, so they can be cached
-		# hard. index.html must not be, or a deploy leaves clients pinned to a
-		# stale bundle that references assets which no longer exist.
+		# Asset names are content-hashed so they cache forever. index.html must
+		# not, or a deploy pins clients to a bundle whose assets are gone.
 		@immutable path /assets/*
 		header @immutable Cache-Control "public, max-age=31536000, immutable"
 		header /index.html Cache-Control "no-cache"
 
-		# Client-side routing: unknown paths return the SPA shell rather than a
-		# 404, so a deep link to /search?q=… works on first load.
+		# Client-side routing: a deep link must return the shell, not a 404.
 		try_files {path} /index.html
 		file_server
 	}

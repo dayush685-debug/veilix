@@ -36,9 +36,9 @@ export function SearchBar({
 
   const suggestions = useSuggestions(query, open && query !== initialQuery);
 
-  // Adjusting state during render rather than in an effect, which is React's
+  // Adjusting state during render instead of in an effect, which is React's
   // documented way to reset state when a prop changes. The effect version
-  // renders once with the stale value, then again with the new one — visible
+  // renders once with the stale value, then again with the new one, visible
   // as a flash of the previous query when navigating between result pages.
   const [lastInitial, setLastInitial] = useState(initialQuery);
   if (initialQuery !== lastInitial) {

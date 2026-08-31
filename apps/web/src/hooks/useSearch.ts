@@ -24,9 +24,9 @@ interface Loaded {
  * ones arrive. Search here takes seconds, not milliseconds, so this is the
  * difference between usable and unpleasant.
  *
- * `loading` is **derived**, not stored: it is simply "the results I hold are
+ * `loading` is derived, not stored: it is simply "the results I hold are
  * not the results that were asked for". Storing it would mean a second piece
- * of state that can disagree with the first — the familiar spinner that never
+ * of state that can disagree with the first, the familiar spinner that never
  * stops because one code path forgot to clear it. Here that state is
  * unrepresentable.
  */

@@ -1,26 +1,16 @@
-# Veilix — base stack.
+# Base stack. Only the edge publishes a port; everything else is
+# reachable over Docker networks alone.
 #
-# Production shape. Publishes nothing except the edge proxy; everything else is
-# reachable only over Docker networks.
-#
-#   docker compose up -d                              core stack
-#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
-#                                                     core + loopback debug ports
-#   docker compose --profile observability up -d      core + Prometheus/Grafana
-#
-# Required variables (see .env.example) fail the command rather than defaulting
-# to something insecure.
+#   docker compose up -d                      core
+#   ... -f docker-compose.dev.yml up -d       core + loopback debug ports
+#   ... --profile observability up -d         core + Prometheus/Grafana
+#   ... -f docker-compose.prod.yml up -d      core on :80/:443 with TLS
 
 name: veilix
 
-# ---------------------------------------------------------------------------
-# Networks — the isolation boundary described in ADR-0004.
-#
-#   backend is `internal: true`, so it has no gateway and no route off the host.
-#   Any service placed ONLY on backend/edge cannot reach the internet at all.
-#   SearXNG is the single service that also joins `egress`, because it is the
-#   only one that needs to talk to upstream search engines.
-# ---------------------------------------------------------------------------
+# ADR-0004. `backend` is internal, so it has no gateway: a service on
+# backend and edge alone cannot reach the internet. SearXNG also joins
+# `egress`, because it alone talks to upstream engines.
 networks:
   edge:
     driver: bridge
@@ -36,8 +26,6 @@ networks:
 x-logging: &default-logging
   driver: json-file
   options:
-    # Bound log growth. Logs carry no query text or client IP
-    # (see docs/privacy.md §4), but unbounded files still fill disks.
     max-size: "10m"
     max-file: "3"
 
@@ -48,37 +36,20 @@ x-hardening: &default-hardening
     - ALL
 
 services:
-  # -------------------------------------------------------------------------
-  # Valkey — ephemeral cache and rate-limit counters.
+  # Cache and rate-limit counters.
   #
-  # Persistence is switched off on purpose. `--save ""` disables RDB snapshots
-  # and `--appendonly no` disables the AOF, so cached result payloads and
-  # rate-limit keys exist in memory only and never touch disk. There is
-  # deliberately no volume mounted here: seizing the host filesystem yields no
-  # search data, because none was ever written. This is a privacy decision
-  # before it is a performance one (docs/privacy.md §2.2).
-  #
-  # LRU eviction means memory pressure degrades the cache hit rate rather than
-  # erroring, which is the correct failure mode for a cache.
-  # -------------------------------------------------------------------------
+  # Persistence is off and no volume is mounted, so cached payloads and
+  # rate-limit keys never reach disk: seizing the filesystem yields no
+  # search data because none was written. LRU eviction degrades the hit
+  # rate under memory pressure instead of erroring.
   valkey:
     image: valkey/valkey:8-alpine
     container_name: veilix-valkey
     restart: unless-stopped
-    # Start directly as the unprivileged valkey user (uid 999, gid 1000).
-    #
-    # The image entrypoint normally starts as root and uses setpriv to drop
-    # privileges, which needs CAP_SETUID/CAP_SETGID — capabilities that
-    # `cap_drop: ALL` removes, producing a crash loop of
-    # "setpriv: setresuid failed: Operation not permitted".
-    #
-    # Handing back those capabilities would work. Starting as the target user
-    # is strictly better: the process is never root at any point, so there is
-    # no privileged window to escape from and no capability to hand back.
+    # The entrypoint would start as root and setpriv down, which needs
+    # CAP_SETUID and so crash-loops under cap_drop: ALL. Starting as the
+    # target user means there is never a privileged window at all.
     user: "999:1000"
-    # Nothing is persisted (see the command below), so the process needs no
-    # writable path at all. Verified: it starts and serves with the whole root
-    # filesystem read-only.
     read_only: true
     command:
       - valkey-server
@@ -105,28 +76,13 @@ services:
         limits:
           memory: 256M
 
-  # -------------------------------------------------------------------------
-  # SearXNG — the meta-search core, run as an unmodified upstream image
-  # (ADR-0001). Configuration is mounted read-only; the image is never patched.
-  #
-  # Publishes no ports. Its JSON API is enabled for the Veilix API to consume
-  # and would be trivially abusable if exposed, which is exactly why it is
-  # reachable only from `backend` (ADR-0004). The dev override file adds a
-  # loopback-only port for debugging.
-  # -------------------------------------------------------------------------
   searxng:
     image: searxng/searxng:2026.8.29-d226b78bc
     container_name: veilix-searxng
     restart: unless-stopped
-    # Run as the image's own searxng account (uid/gid 977) instead of root.
-    #
-    # Upstream ships this image running Granian as uid 0 and never drops
-    # privileges (SF-001). Its entrypoint guards the config chown with an
-    # `id -u = 0` check, so as a non-root user that step is skipped with a
-    # warning rather than failing - which is what makes this override safe.
-    #
-    # Root in a container is not root on the host, but it removes a layer:
-    # combined with a kernel or runtime bug it shortens the path to escape.
+    # Upstream runs Granian as root and never drops privileges. Its
+    # entrypoint guards the config chown with an `id -u = 0` test, so
+    # running as 977 skips that step with a warning instead of failing.
     user: "977:977"
     networks:
       # Order matters for the default route: egress carries the gateway.
@@ -134,31 +90,24 @@ services:
       - egress
     read_only: true
     tmpfs:
-      # SearXNG writes SQLite caches to /tmp and /var/cache/searxng. Both are
-      # tmpfs rather than volumes, so the contents live in memory and never
-      # reach disk.
-      #
-      # Checked rather than assumed: a canary query was run and both databases
-      # were searched for its text. They hold engine metadata and tracker
-      # patterns, no query text. The tmpfs is belt-and-braces on top of that.
-      #
-      # noexec/nosuid so a write primitive cannot stage and run a binary.
+      # SearXNG writes SQLite caches to both paths. A canary query confirmed
+      # they hold engine metadata and tracker patterns, not query text; tmpfs
+      # keeps them off disk regardless. noexec/nosuid so a write primitive
+      # cannot stage a binary.
       - /tmp:rw,noexec,nosuid,size=64m
       - /var/cache/searxng:rw,noexec,nosuid,size=64m
     volumes:
       - ./infra/searxng/settings.yml:/etc/searxng/settings.yml:ro
     environment:
-      # Fails the command with a readable message if unset, rather than
-      # silently starting with upstream's "ultrasecretkey" placeholder.
       # Quoted because the failure message contains a colon, which would
-      # otherwise terminate the YAML scalar.
+      # otherwise end the YAML scalar.
       SEARXNG_SECRET: "${SEARXNG_SECRET:?required — generate with openssl rand -hex 32}"
-      # Instance ROOT, with a trailing slash. A path suffix here makes SearXNG
-      # believe it is mounted under that path and 308-redirect every request.
+      # Instance root, trailing slash required: a path suffix makes SearXNG
+      # think it is mounted there and 308 every request.
       SEARXNG_BASE_URL: "${VEILIX_PUBLIC_URL:-http://localhost:8088}/"
       SEARXNG_BIND_ADDRESS: "0.0.0.0"
       SEARXNG_PORT: "8080"
-      # Granian, not uWSGI — verified against this image tag.
+      # Granian, not uWSGI, verified against this image tag.
       GRANIAN_WORKERS: "1"
       GRANIAN_BLOCKING_THREADS: "4"
     <<: *default-hardening
@@ -169,26 +118,18 @@ services:
       interval: 15s
       timeout: 6s
       retries: 5
-      # Engine initialisation on a cold start takes a while.
+      # Engine initialisation on a cold start is slow.
       start_period: 45s
     deploy:
       resources:
         limits:
           memory: 512M
 
-  # -------------------------------------------------------------------------
-  # Veilix API — the only service that talks to SearXNG.
+  # The meta-search core, an unmodified upstream image (ADR-0001).
   #
-  # Sits on `edge` and `backend` only. Because `backend` is internal:true and
-  # `edge` carries no outward route for it, this container CANNOT REACH THE
-  # INTERNET (ADR-0004). Code execution here cannot dial out, exfiltrate over
-  # the network, or reach a cloud metadata endpoint.
-  #
-  # Hardened beyond the shared fragment: the root filesystem is read-only, so
-  # a write primitive has nowhere to drop a payload. /tmp is a small tmpfs with
-  # noexec and nosuid, which covers Python's need for scratch space without
-  # granting a place to stage and run a binary.
-  # -------------------------------------------------------------------------
+  # Publishes no ports. Its JSON API is enabled for our API to consume and
+  # would be trivially abusable if exposed, which is why it is reachable
+  # only from `backend`.
   api:
     build:
       context: ./apps/api
@@ -208,19 +149,9 @@ services:
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=32m
-    # The WHOLE of .env reaches the container, rather than a hand-maintained
-    # list of variables in `environment:`.
-    #
-    # That list was the bug. Nine documented settings - the API-key rate limit,
-    # both circuit-breaker knobs, retries, safesearch and language defaults,
-    # max page, metrics toggle, CORS origins - were absent from it, so setting
-    # any of them in .env did nothing at all. No error, no warning: the
-    # operator changes a value, restarts, and the behaviour is unchanged.
-    # Found while raising a limit for a load test and watching it not apply.
-    #
-    # `format: raw` is required on both files. Compose interpolates `$` in
-    # every file it loads for interpolation, which mangles the Argon2 hashes
-    # in .env.secrets into something that rejects every correct password.
+    # The whole of .env reaches the container. A hand-maintained env: list
+    # drifts silently: a setting gets plumbed through config, documented,
+    # and never actually reaches the process.
     env_file:
       - path: .env
         format: raw
@@ -235,7 +166,7 @@ services:
     <<: *default-hardening
     logging: *default-logging
     healthcheck:
-      # python rather than curl: the slim base has no curl, and adding one
+      # python instead of curl: the slim base has no curl, and adding one
       # would put an HTTP client into the runtime image for the sole benefit
       # of an attacker who lands there.
       test:
@@ -252,19 +183,12 @@ services:
         limits:
           memory: 320M
 
-  # -------------------------------------------------------------------------
-  # Caddy — the only container that publishes a port (ADR-0005).
+  # The only container publishing a port (ADR-0005). Serves the SPA baked
+  # into its own image and proxies /api plus /img.
   #
-  # Terminates TLS, applies security headers, serves the SPA baked into its own
-  # image, and proxies exactly two things: /api to the API, and /img to
-  # SearXNG's image proxy.
-  #
-  # It joins `backend` for that second route alone. The API cannot serve image
-  # bytes because ADR-0004 leaves it without an internet route, so the fetch has
-  # to happen in the one container that has one. Only /image_proxy is exposed;
-  # SearXNG's search, config, and stats endpoints stay unreachable, which is
-  # what keeps `limiter: false` safe (SF-004).
-  # -------------------------------------------------------------------------
+  # It joins `backend` for /img alone: the API has no internet route, so
+  # image fetches happen in the container that does. Only /image_proxy is
+  # reachable, which keeps SearXNG's `limiter: false` safe.
   caddy:
     build:
       context: .
@@ -272,8 +196,7 @@ services:
     image: veilix-web:local
     container_name: veilix-caddy
     restart: unless-stopped
-    # Matches the USER baked into the image. Stated here too so the intent is
-    # visible in the topology rather than only in a Dockerfile.
+    # Matches the USER in the image; stated here so it is visible in topology.
     user: "10002:10002"
     depends_on:
       api:
@@ -288,7 +211,7 @@ services:
       # Setting a real hostname (search.example.com) makes Caddy request a
       # Let's Encrypt certificate, which needs public DNS and ports 80/443.
       #
-      # The default is written ":-:8080" — a Compose default of ":8080" — and
+      # The default is written ":-:8080", a Compose default of ":8080", and
       # not Caddy's own "::8080" default syntax, which Compose would try to
       # interpolate and reject.
       VEILIX_SITE_ADDRESS: "${VEILIX_SITE_ADDRESS:-:8080}"
@@ -297,9 +220,8 @@ services:
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=16m
     volumes:
-      # Certificates and ACME account keys. Named volumes, not bind mounts:
-      # this tree is inside a OneDrive sync root, and syncing private keys to
-      # a cloud folder is not a thing to do by accident.
+      # Named volumes, not bind mounts: TLS private keys must not end up in a
+      # synced folder.
       - caddy_data:/data
       - caddy_config:/config
     <<: *default-hardening
@@ -315,22 +237,11 @@ services:
         limits:
           memory: 128M
 
-  # -------------------------------------------------------------------------
-  # Observability — opt-in.
+  # Opt-in: together these cost about as much memory as the whole core
+  # stack, and an instance serves search perfectly well without them.
   #
-  #   docker compose --profile observability up -d
-  #
-  # Behind a profile because Prometheus and Grafana together cost roughly as
-  # much memory as the entire core stack, and a 2.77 GiB Docker VM cannot spare
-  # that by default. It is also the honest split: an instance can serve search
-  # perfectly well without them, so they should not be a precondition for
-  # running the product.
-  #
-  # Neither publishes a port in the production file. Grafana's login is a real
-  # authentication surface and Prometheus has none at all, so exposing either
-  # to the internet would undo the topology in ADR-0004. Reach them through the
-  # dev override, or an SSH tunnel in production.
-  # -------------------------------------------------------------------------
+  # Neither publishes a port in production. Prometheus has no
+  # authentication at all; reach it through Grafana, or an SSH tunnel.
   prometheus:
     image: prom/prometheus:v3.1.0
     container_name: veilix-prometheus
@@ -339,16 +250,9 @@ services:
     user: "65534:65534"
     read_only: true
     networks:
-      # `backend` ONLY, and never published.
-      #
-      # Prometheus has no authentication whatsoever, so anything that can reach
-      # it can read every metric and, worse, use it as a scanner. Being on an
-      # internal:true network makes that structural rather than a matter of
-      # remembering: the network has no gateway, so a `ports:` entry here would
-      # be silently inert even if someone added one.
-      #
-      # Humans reach these metrics through Grafana, which proxies queries over
-      # this network. Nobody needs to reach Prometheus directly.
+      # backend only. Prometheus has no authentication, so anything that
+      # reaches it reads every metric. On an internal network a `ports:` entry
+      # here would be inert anyway.
       - backend
     volumes:
       - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
@@ -357,14 +261,9 @@ services:
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
-      # 15 days. Operational aggregates age out of usefulness quickly, and
-      # unbounded retention on a small host is how a disk fills.
       - --storage.tsdb.retention.time=15d
       - --storage.tsdb.retention.size=1GB
-      # kingpin syntax: boolean flags are negated with --no-<flag>, not
-      # "=false", which it rejects outright with "unexpected false".
-      # Off by default anyway; stated explicitly because a reload endpoint
-      # that can re-read config at runtime is a surface worth denying.
+      # kingpin negates booleans with --no-<flag>; "=false" is a parse error.
       - --no-web.enable-lifecycle
     <<: *default-hardening
     logging: *default-logging
@@ -389,9 +288,8 @@ services:
       prometheus:
         condition: service_healthy
     networks:
-      # `edge` as well as `backend`, because unlike Prometheus this one is meant
-      # for a human to open. It queries Prometheus over `backend` in proxy mode,
-      # so the browser never talks to Prometheus directly.
+      # On edge too, because unlike Prometheus this one is meant to be opened.
+      # It proxies queries over backend, so the browser never reaches Prometheus.
       - edge
       - backend
     volumes:
@@ -401,9 +299,7 @@ services:
     environment:
       GF_SECURITY_ADMIN_USER: "${GRAFANA_ADMIN_USER:-admin}"
       GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD before enabling the observability profile}"
-      # Anonymous access off, sign-up off, and no phoning home: this is an
-      # operations tool, not a public page, and it should not report usage
-      # anywhere on a privacy-first deployment.
+      # No anonymous access, no sign-up, and no usage reporting.
       GF_AUTH_ANONYMOUS_ENABLED: "false"
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_ANALYTICS_REPORTING_ENABLED: "false"

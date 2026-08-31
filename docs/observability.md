@@ -23,12 +23,12 @@ the product.
 
 ## Logs
 
-Structured JSON via structlog. The schema is deliberately narrow: timestamp,
+Structured JSON via structlog. The schema is narrow: timestamp,
 level, logger, request ID, method, **route template**, status, duration.
 
 Enforcement is a processor that runs on *every* event and redacts a denylist of
 keys — `q`, `query`, `client_ip`, `authorization`, `cookie`, and the rest. A
-developer who logs a query sees `<redacted>` in the output rather than shipping
+developer who logs a query sees `<redacted>` in the output instead of shipping
 it. Discipline is not the control; the processor is.
 
 Deliberately absent: query text, full URLs, client addresses, request bodies,
@@ -164,7 +164,7 @@ view of individual searches, query text, or client addresses, and no way to add
 one without changing what the system collects.
 
 That is the difference between an operations dashboard and a surveillance tool
-with a login page, and it is structural rather than a matter of what got built.
+with a login page, and it is structural instead of a matter of what got built.
 
 ## Network placement
 

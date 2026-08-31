@@ -1,7 +1,7 @@
 """Metrics and tracing.
 
-The governing rule from docs/privacy.md §8: **no metric label may carry a
-user-derived value.** No IP, no hashed IP, no query text, no session ID.
+The governing rule from docs/privacy.md §8: no metric label may carry a
+user-derived value. No IP, no hashed IP, no query text, no session ID.
 
 That is not only a privacy rule, it is also what keeps Prometheus healthy —
 per-user labels are precisely the unbounded-cardinality mistake that melts a
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 # "Duplicated timeseries", and any dependency can quietly publish into it.
 REGISTRY: Final = CollectorRegistry()
 
-# Buckets chosen for this workload rather than copied from a template. A live
+# Buckets chosen for this workload instead of copied from a template. A live
 # probe measured general search at 1.7-5.0s, so the interesting resolution is
 # between 100ms (a cache hit) and 10s (the outer timeout). Sub-50ms buckets
 # would waste series on a range only health checks occupy.
@@ -166,7 +166,7 @@ _URL_ATTRIBUTES: Final = ("http.url", "url.full")
 def _redact_span_urls(span: Any) -> None:
     """Strip the query string from a span's URL attributes.
 
-    **This exists because tracing leaked search queries.** OpenTelemetry's HTTP
+    This exists because tracing leaked search queries. OpenTelemetry's HTTP
     instrumentations record the full request URL by default, so a traced search
     exported
 

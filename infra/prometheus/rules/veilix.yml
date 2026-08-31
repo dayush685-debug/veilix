@@ -4,7 +4,7 @@
 # alert nobody acts on trains people to ignore alerts, so conditions that are
 # merely interesting are left as dashboard panels instead.
 #
-# Note what is deliberately absent: nothing alerts on individual users,
+# Note what is absent: nothing alerts on individual users,
 # because no metric carries a user-derived label (docs/privacy.md §8).
 
 groups:
@@ -24,7 +24,7 @@ groups:
 
       - alert: SearchBackendCircuitOpen
         # 2 = open. The breaker sheds load rather than queuing against a wedged
-        # backend, so this is the system working — but it means users are
+        # backend, so this is the system working, but it means users are
         # getting 503s and someone should look at SearXNG.
         expr: veilix_breaker_state{dependency="searxng"} == 2
         for: 2m
@@ -64,7 +64,7 @@ groups:
         annotations:
           summary: "p95 cold search latency above 10s"
           description: >-
-            Usually upstream engines being slow rather than a fault here.
+            Usually upstream engines being slow instead of a fault here.
             Check which engines are failing before changing anything.
 
   - name: veilix-recording

@@ -42,6 +42,6 @@ so the configuration surface does move under us, and pinning image digests plus 
 release notes is a real operational obligation.
 
 **Rejected alternatives.** Commercial search APIs — recurring cost, and the privacy
-property would be contractual rather than architectural. A custom scraper fleet —
+property would be contractual instead of architectural. A custom scraper fleet —
 maintenance burden out of all proportion to the value. YaCy — a P2P distributed index,
 which is a genuinely different product with different result characteristics.

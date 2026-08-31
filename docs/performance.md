@@ -44,7 +44,7 @@ index.html   36 ms, 896 B over the wire (1,502 B raw, zstd)
 
 **The cache is the difference between two different products.** Roughly 100×
 on the median. It is also why the cache-versus-privacy trade-off in
-[`privacy.md` §7](privacy.md) was worth thinking about carefully rather than
+[`privacy.md` §7](privacy.md) was worth thinking about carefully instead of
 switching on by reflex.
 
 ### What actually dominates cold latency
@@ -92,7 +92,7 @@ results while at least one upstream engine was unavailable.
 
 That is not a fault, it is the steady state for a self-hosted instance — large
 engines CAPTCHA and rate-limit them. It is why the API reports `degraded` and
-names the failing engines rather than quietly returning less, and why
+names the failing engines instead of quietly returning less, and why
 [ADR-0006](adr/0006-one-circuit-breaker-not-per-engine.md) leaves per-engine
 back-off to SearXNG, which already classifies failures by type.
 
@@ -187,5 +187,5 @@ docker run --rm -i --network veilix_edge \
   grafana/k6 run - < tests/load/search.js
 ```
 
-Without an API key the run measures the rate limiter rather than the search
+Without an API key the run measures the rate limiter instead of the search
 path — which is a legitimate thing to measure, but a different one.

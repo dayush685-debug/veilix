@@ -1,4 +1,4 @@
-# Veilix — development override.
+# Veilix, development override.
 #
 #   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 #
@@ -34,7 +34,7 @@ services:
     environment:
       VEILIX_LOG_LEVEL: debug
 
-  # Prometheus is deliberately NOT published, even here.
+  # Prometheus is not published, even here.
   #
   # It sits only on `backend`, which is internal:true and has no gateway, so a
   # ports: entry would be silently inert - the same measured behaviour as

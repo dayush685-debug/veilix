@@ -186,7 +186,7 @@ class TestSuggestions:
 class TestOperationsEndpoints:
     async def test_liveness_does_not_touch_dependencies(self, client: httpx.AsyncClient) -> None:
         # No respx mock registered: any upstream call would fail the test,
-        # which is the point — liveness must not depend on anything.
+        # which is the point, liveness must not depend on anything.
         response = await client.get("/api/v1/live")
         assert response.status_code == 200
         assert response.json() == {"status": "alive"}

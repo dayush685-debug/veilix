@@ -51,7 +51,7 @@ class Settings(BaseSettings):
     # -- Secrets ------------------------------------------------------------
 
     # Shared with the SearXNG container. Needed to sign image-proxy URLs so
-    # thumbnails are fetched server-side rather than by the user's browser
+    # thumbnails are fetched server-side instead of by the user's browser
     # (docs/privacy.md §6). Read without the VEILIX_ prefix because the same
     # variable configures the SearXNG service.
     searxng_secret: str = Field(default="", validation_alias="SEARXNG_SECRET")

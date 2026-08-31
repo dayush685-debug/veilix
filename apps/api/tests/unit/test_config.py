@@ -2,7 +2,7 @@
 
 These tests guard the fail-fast safety net. If this validation breaks, the
 failure mode is the worst kind available: a production instance starts
-successfully, serves traffic, reports healthy, and is insecure — with a
+successfully, serves traffic, reports healthy, and is insecure, with a
 forgeable SearXNG secret, an open admin endpoint, or no rate limiting.
 
 Nothing else in the system detects that state, so it is worth testing the
@@ -112,7 +112,7 @@ class TestApiKeyDigestValidation:
     )
     def test_rejects_malformed_digests(self, value: str) -> None:
         # A malformed digest would silently never match, so every request with
-        # a valid key would be rejected — an outage that looks like an auth bug.
+        # a valid key would be rejected, an outage that looks like an auth bug.
         with pytest.raises(ValidationError, match="SHA-256"):
             Settings(env="development", api_key_hashes=value)
 
@@ -191,7 +191,7 @@ class TestBounds:
         """Deliberately permissive, unlike the API's request validation.
 
         A container's environment is full of variables belonging to other
-        things — PATH, HOSTNAME, and whatever the platform injects. Rejecting
+        things. PATH, HOSTNAME, and whatever the platform injects. Rejecting
         unknown keys here would make the service refuse to start for reasons
         that have nothing to do with it.
         """

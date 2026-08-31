@@ -1,18 +1,8 @@
-"""Privacy-preserving rate limiting.
+"""Rate limiting keyed by a rotating-salt HMAC of the client IP (ADR-0003).
 
-Implements ADR-0003. Two ideas carry the module:
-
-**The identity is a rotating-salt HMAC, never an IP.** The raw address is a
-function argument and nothing else — it is never written to Valkey, a log, or
-a metric label. Because the salt rotates daily and is derived rather than
-stored, yesterday's buckets cannot be linked to any address by anyone,
-including whoever holds the database. The limiter can count a client; it
-cannot remember one.
-
-**The window slides.** A fixed window lets a client spend its full budget in
-the last second of one window and again in the first second of the next, so
-the real burst capacity is double the configured limit. The weighted
-two-window estimate below removes that at the cost of one extra counter.
+The raw address is a function argument and nothing else. It never reaches
+Valkey, a log, or a metric label, and the daily salt is derived rather than
+stored, so yesterday's buckets cannot be tied back to an address.
 """
 
 from __future__ import annotations
@@ -31,12 +21,8 @@ from veilix.core.telemetry import ratelimit_events_total
 
 log = get_logger(__name__)
 
-# Atomic increment-and-read of the current and previous window counters.
-#
-# Server-side because the alternative is read-then-write from the client,
-# which races: two concurrent requests both read N, both write N+1, and one
-# request is served for free. Under exactly the burst the limiter exists to
-# stop, that race is at its most likely.
+# Server-side so the increment and read are atomic. Read-then-write from the
+# client races under exactly the burst this exists to stop.
 _SLIDING_WINDOW_LUA = """
 local current_key  = KEYS[1]
 local previous_key = KEYS[2]
@@ -45,15 +31,14 @@ local elapsed      = tonumber(ARGV[2])
 
 local current = redis.call('INCR', current_key)
 if current == 1 then
-  -- First hit in this window: expire after two windows so the counter is
-  -- still readable as "previous" while the next window is active.
+  -- Two windows, so this counter is still readable as "previous" during the
+  -- next one.
   redis.call('EXPIRE', current_key, window * 2)
 end
 
 local previous = tonumber(redis.call('GET', previous_key)) or 0
 
--- Weight the previous window by the fraction of it still inside the sliding
--- window. At 25% through the current window, 75% of the previous one counts.
+-- 25% into the current window, 75% of the previous one still counts.
 local weight = 1.0 - (elapsed / window)
 local estimate = current + (previous * weight)
 
@@ -93,13 +78,10 @@ class RateLimiter:
     # -- identity ----------------------------------------------------------
 
     def _daily_salt(self, now: datetime | None = None) -> bytes:
-        """Derive today's salt from the configured seed and the UTC date.
+        """Today's salt, derived from the seed and the UTC date.
 
-        Derived rather than stored, so there is no salt at rest to steal and
-        no rotation job to fail. Deriving it also means every replica computes
-        the same salt for the same day, which a randomly generated per-process
-        salt would not — each replica would otherwise enforce its own separate
-        limit for the same client.
+        Derived, not stored: no salt at rest to steal, no rotation job to fail,
+        and every replica computes the same value for a given day.
         """
         day = (now or datetime.now(UTC)).strftime("%Y-%m-%d")
         return hashlib.sha256(f"{self._salt_seed}:{day}".encode()).digest()
@@ -107,11 +89,8 @@ class RateLimiter:
     def bucket_for_ip(self, client_ip: str, now: datetime | None = None) -> str:
         """Unlinkable bucket identifier for an anonymous client.
 
-        Truncated to 16 hex characters (64 bits). Enough that accidental
-        collisions between concurrent clients are negligible, short enough to
-        keep keys small. Truncation is not a weakness here — the value is
-        already unpredictable without the salt, and shortening it only removes
-        information.
+        64 bits is plenty: the value is already unpredictable without the salt,
+        so truncating only discards information.
         """
         digest = hmac.new(self._daily_salt(now), client_ip.encode(), hashlib.sha256)
         return digest.hexdigest()[:16]
@@ -123,12 +102,11 @@ class RateLimiter:
         api_key: str | None,
         now: datetime | None = None,
     ) -> ClientIdentity:
-        """Build the caller's identity for limiting purposes.
+        """Identify the caller for limiting purposes.
 
-        Callers presenting a verified API key are bucketed by a digest of the
-        key rather than by address, so a legitimate integration behind a
-        changing IP keeps one budget, and several users behind one corporate
-        NAT do not share one.
+        Verified API keys bucket by key digest, not address, so an integration
+        behind a changing IP keeps one budget and users behind one NAT do not
+        share one.
         """
         if api_key:
             digest = hashlib.sha256(api_key.encode()).hexdigest()[:16]
@@ -145,12 +123,9 @@ class RateLimiter:
     async def check(self, identity: ClientIdentity) -> RateLimitDecision:
         """Record a request and decide whether it is allowed.
 
-        **Fails open.** If Valkey is unreachable the request is permitted, and
-        that is a deliberate trade: a cache outage would otherwise become a
-        total outage, turning a degraded dependency into a hard one. The
-        opposite choice — fail closed — converts every Valkey hiccup into a
-        site-wide 429. The exposure window is bounded by how long Valkey stays
-        down, and the failure is logged loudly so it is not silent.
+        Fails open. Failing closed would turn any Valkey hiccup into a
+        site-wide 429, so a degraded dependency stays degraded instead of
+        becoming a hard one. Logged at error level.
         """
         limit = self.limit_for(identity)
 

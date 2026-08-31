@@ -204,8 +204,8 @@ class TestImageProxySigning:
         """The signing-oracle guard for SF-003.
 
         A hostile page that ranks in results could carry an img_src aimed at
-        the cloud metadata endpoint. Signing it would have SearXNG — which does
-        have egress — fetch it on the attacker's behalf.
+        the cloud metadata endpoint. Signing it would have SearXNG, which does
+        have egress, fetch it on the attacker's behalf.
         """
         respx.get(f"{SEARXNG_BASE}/search").mock(
             return_value=httpx.Response(

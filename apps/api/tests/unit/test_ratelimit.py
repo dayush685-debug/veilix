@@ -40,7 +40,7 @@ class TestBucketPrivacy:
     def test_bucket_changes_across_days(self, limiter: RateLimiter) -> None:
         """The core unlinkability property.
 
-        After rotation, yesterday's keys cannot be tied to any address — not by
+        After rotation, yesterday's keys cannot be tied to any address, not by
         the operator, not by whoever obtains the datastore. This is what makes
         cross-day correlation not merely forbidden but uncomputable.
         """

@@ -46,7 +46,7 @@ export function About() {
       <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)]">
         Large search engines rate-limit and CAPTCHA self-hosted instances, so
         several are usually unavailable at any moment. When that happens the
-        results page says so and names them, rather than quietly returning less
+        results page says so and names them, instead of quietly returning less
         and looking confident about it. It is the honest trade for not being
         the product.
       </p>

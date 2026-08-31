@@ -3,7 +3,7 @@
  *
  * Types mirror `apps/api/src/veilix/schemas/search.py`. They are hand-written
  * rather than generated, because the generated output for this small a surface
- * is harder to read than the source of truth it came from — and a contract
+ * is harder to read than the source of truth it came from, and a contract
  * test (`api.contract.test.ts`) checks them against the live OpenAPI document,
  * which is what actually catches drift.
  */
@@ -65,7 +65,7 @@ export interface SearchResponse {
   category: SearchCategory;
   page: number;
   /**
-   * Results on this page. Deliberately NOT a web-scale total — the upstream
+   * Results on this page. Deliberately NOT a web-scale total, the upstream
    * reports none, so inventing one would be a lie the interface tells.
    */
   count: number;
@@ -125,7 +125,7 @@ export interface SearchParams {
  * An API error carrying the RFC 9457 problem details.
  *
  * `requestId` is surfaced in the UI so a user reporting a problem can quote
- * something that maps to a server log line — without us having logged their
+ * something that maps to a server log line, without us having logged their
  * query to make that possible.
  */
 export class ApiError extends Error {
@@ -149,7 +149,7 @@ export class ApiError extends Error {
     return this.status === 429 || this.status >= 500;
   }
 
-  /** Whether the failure is ours (or upstream's) rather than the caller's. */
+  /** Whether the failure is ours (or upstream's) instead of the caller's. */
   get isServerSide(): boolean {
     return this.status >= 500;
   }

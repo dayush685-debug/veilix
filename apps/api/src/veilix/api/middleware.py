@@ -1,8 +1,8 @@
 """Request-scoped middleware: correlation, metrics, and rate limiting.
 
 Ordering matters and is set in ``main.py``. Correlation runs outermost so that
-every log line — including one written by the rate limiter rejecting a
-request — carries a request ID.
+every log line, including one written by the rate limiter rejecting a
+request, carries a request ID.
 """
 
 from __future__ import annotations
@@ -50,7 +50,7 @@ class CorrelationMiddleware(BaseHTTPMiddleware):
     """Assigns a request ID and binds it for the duration of the request.
 
     The ID correlates log lines *within one request*. It is regenerated per
-    request and is not a session identifier — two requests from the same
+    request and is not a session identifier, two requests from the same
     person share nothing, which is what stops it becoming a tracking token by
     accident.
     """
@@ -104,7 +104,7 @@ class MetricsMiddleware(BaseHTTPMiddleware):
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """Enforces per-identity limits before a request reaches a route.
 
-    Implemented as middleware rather than a route dependency so that it cannot
+    Implemented as middleware instead of a route dependency so that it cannot
     be forgotten on a new endpoint. A limiter you have to remember to apply is
     a limiter that will eventually be missing from the one route that needed
     it most.

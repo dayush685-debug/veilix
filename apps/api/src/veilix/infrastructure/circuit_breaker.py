@@ -1,15 +1,15 @@
 """Circuit breaker for the search backend.
 
 Exactly one breaker exists, around SearXNG as a whole. Per-engine breaking is
-upstream's job and it already does it better than we could — with error-typed
+upstream's job and it already does it better than we could, with error-typed
 back-off, and with visibility into individual engine calls that we do not have
 (ADR-0006).
 
-Scope, stated honestly: this breaker is **per process**. With one API replica
+Scope, stated honestly: this breaker is per process. With one API replica
 that is the whole system. With several, each maintains its own view and the
 effective failure threshold multiplies by the replica count. Sharing state
 through Valkey would fix that, at the cost of a network round trip on the path
-that is already failing — which is the wrong place to add a dependency. The
+that is already failing, which is the wrong place to add a dependency. The
 single-replica assumption is recorded rather than papered over.
 """
 
@@ -42,7 +42,7 @@ _STATE_VALUE = {BreakerState.CLOSED: 0.0, BreakerState.HALF_OPEN: 1.0, BreakerSt
 class CircuitBreaker:
     """Trips after consecutive failures; probes once after a cooldown.
 
-    Consecutive rather than windowed failure counting is chosen on purpose: an
+    Consecutive instead of windowed failure counting is chosen on purpose: an
     instance that is fundamentally unreachable fails every call in a row and
     trips quickly, while an instance that intermittently drops one call in ten
     keeps serving. A ratio-based breaker would trip on the second case, which
@@ -72,7 +72,7 @@ class CircuitBreaker:
         # released before `fn` is awaited, so without this flag every request
         # that arrived during the cooldown would observe state HALF_OPEN, find
         # nothing blocking it, and be admitted. Ten concurrent requests would
-        # send ten probes into a dependency that is still recovering — exactly
+        # send ten probes into a dependency that is still recovering, exactly
         # the stampede the breaker exists to prevent.
         self._probe_in_flight = False
 
@@ -138,7 +138,7 @@ class CircuitBreaker:
 
             if self._state is BreakerState.HALF_OPEN:
                 # The probe failed: reopen immediately and restart the
-                # cooldown, rather than letting more traffic through.
+                # cooldown, instead of letting more traffic through.
                 self._opened_at = time.monotonic()
                 self._transition(BreakerState.OPEN)
                 return

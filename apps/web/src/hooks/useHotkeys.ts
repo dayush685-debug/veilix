@@ -8,7 +8,7 @@ type Handlers = Record<string, () => void>;
  * Shortcuts are suppressed while the user is typing in a field, with one
  * exception: Escape, which must always be able to dismiss. Without that guard,
  * pressing "/" to type a slash inside the search box would instead re-trigger
- * the focus shortcut — the classic bug that makes keyboard shortcuts feel
+ * the focus shortcut, the classic bug that makes keyboard shortcuts feel
  * hostile rather than fast.
  */
 export function useHotkeys(handlers: Handlers): void {

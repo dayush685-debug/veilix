@@ -1,8 +1,8 @@
 """Application factory and lifespan.
 
 This module wires things together and holds no business logic. Everything it
-constructs is long-lived and expensive to create — connection pools, the
-provider, the breaker — so it is built once at startup and read back through
+constructs is long-lived and expensive to create, connection pools, the
+provider, the breaker, so it is built once at startup and read back through
 `api/deps.py`.
 
 Startup is deliberately noisy about its own configuration. An operator should
@@ -50,15 +50,15 @@ DESCRIPTION = """
 A privacy-first meta-search API.
 
 Queries are forwarded to many upstream search engines and merged. There are no
-accounts, no cookies, no search history, and no user profiling — see the
+accounts, no cookies, no search history, and no user profiling, see the
 privacy model for the complete data inventory, including what the operator of
 an instance can still technically observe.
 
-**Two things to know when integrating:**
+Two things to know when integrating:
 
 *Partial results are normal.* Upstream engines routinely CAPTCHA or rate-limit
 self-hosted instances. A successful response may list engines in `failures`
-while still returning good results. Check the `degraded` flag rather than
+while still returning good results. Check the `degraded` flag instead of
 assuming every engine answered.
 
 *There is no total result count.* The upstream does not report one, so Veilix
@@ -79,7 +79,7 @@ def _build_http_client(settings: Settings) -> httpx.AsyncClient:
         timeout=httpx.Timeout(settings.search_timeout_s, connect=3.0),
         # Redirects are not followed: the only host we call is a fixed internal
         # address, so a redirect means something unexpected, and following it
-        # would be the first step of an SSRF chain rather than a convenience.
+        # would be the first step of an SSRF chain instead of a convenience.
         follow_redirects=False,
         headers={"User-Agent": f"Veilix/{__version__}"},
     )
@@ -144,7 +144,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         admin_configured=bool(settings.admin_password_hash),
         tracing_enabled=getattr(app.state, "tracing_enabled", False),
         # Warn rather than fail: without the shared secret, image proxying
-        # cannot be signed, so thumbnails would have to be dropped rather than
+        # cannot be signed, so thumbnails would have to be dropped instead of
         # silently served from third-party hosts.
         image_proxy_signing=bool(settings.searxng_secret),
     )
@@ -200,7 +200,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     if settings.cors_origin_list:
         # The SPA is same-origin behind Caddy and needs no CORS entry. This
         # exists for third-party API consumers, and is configured with explicit
-        # origins — never a wildcard, which production config validation
+        # origins, never a wildcard, which production config validation
         # rejects outright.
         app.add_middleware(
             CORSMiddleware,

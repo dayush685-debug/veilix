@@ -1,6 +1,6 @@
 """Operations endpoints, behind HTTP Basic over TLS.
 
-**What this deliberately does not expose**: individual searches, query text,
+What this deliberately does not expose: individual searches, query text,
 client addresses, per-user anything. The dashboard answers "is the system
 healthy" and never "what did people search for". An admin panel that could
 answer the second question would be a surveillance tool that happens to have a
@@ -51,7 +51,7 @@ class EngineHealthEntry(BaseModel):
     """Health of one upstream engine.
 
     Derived from failures observed on real queries, which is why an engine
-    nobody has searched recently has no entry here at all — its health is
+    nobody has searched recently has no entry here at all, its health is
     *unknown*, not good. Showing a green tick for an engine we have not
     exercised would be a claim we have not earned.
     """
@@ -139,7 +139,7 @@ async def overview(
 # ---------------------------------------------------------------------------
 # Metric readback
 #
-# The dashboard reads the same registry Prometheus scrapes rather than keeping
+# The dashboard reads the same registry Prometheus scrapes instead of keeping
 # its own counters. One source of truth means the panel and the alert can never
 # disagree about what happened.
 # ---------------------------------------------------------------------------

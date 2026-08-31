@@ -56,7 +56,7 @@ describe('SearchBar', () => {
   it('exposes the ARIA combobox contract', () => {
     const { input } = renderBar();
     // Without these, suggestions are invisible to anyone not looking at the
-    // screen — the component would look finished and be unusable.
+    // screen, the component would look finished and be unusable.
     expect(input).toHaveAttribute('role', 'combobox');
     expect(input).toHaveAttribute('aria-expanded', 'false');
     expect(input).toHaveAttribute('aria-autocomplete', 'list');

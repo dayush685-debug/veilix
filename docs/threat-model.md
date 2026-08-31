@@ -112,7 +112,7 @@ node.
 The API signs image URLs so SearXNG will proxy them, which makes it a **signing
 oracle for URLs chosen by whoever ranks in results**. SearXNG has egress.
 
-Measured blast radius, by probing from inside the container rather than
+Measured blast radius, by probing from inside the container instead of
 reasoning about it: SearXNG could reach `valkey:6379`, `api:8000`, and an
 unrelated project's PostgreSQL at `172.20.0.2:5432` on the same Docker host.
 
@@ -245,7 +245,7 @@ Logging a query is a privacy incident even though it is not a breach. Discipline
 does not survive a growing codebase, so this is enforced by machinery:
 
 - A structlog processor drops sensitive keys on **every** event, so a developer
-  who logs a query sees `<redacted>` rather than shipping it.
+  who logs a query sees `<redacted>` instead of shipping it.
 - Route *templates* in metrics, never resolved URLs.
 - 500 responses carry no exception detail; an exception raised mid-search can
   hold the query in its message.

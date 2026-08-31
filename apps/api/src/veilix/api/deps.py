@@ -1,12 +1,9 @@
 """Dependency wiring.
 
-Long-lived objects — the HTTP client, the Valkey connection pool, the provider,
-the breaker — are built once during application startup and stored on
-``app.state``. These functions read them back.
-
-Building them per request would defeat the point of connection pooling and
-give every request its own circuit breaker, which would be no circuit breaker
-at all: state that resets each request cannot count consecutive failures.
+The HTTP client, Valkey pool, provider and breaker are built once at startup
+and stored on ``app.state``; these functions read them back. Building them per
+request would give each request its own circuit breaker, which cannot count
+consecutive failures and so is no breaker at all.
 """
 
 from __future__ import annotations

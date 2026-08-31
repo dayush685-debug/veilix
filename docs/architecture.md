@@ -209,7 +209,7 @@ What follows from that:
 - **One circuit breaker, at the right level**: around the *SearXNG dependency itself*,
   protecting the API from a wedged or overloaded instance.
 - **Provider health telemetry comes from `unresponsive_engines`** — real measured data,
-  not synthetic health checks.
+ , not synthetic health checks.
 
 ## 8. Security model (design level)
 
@@ -244,7 +244,7 @@ classic SSRF surface does not exist in the API — and the internal-network isol
 even a successful one could reach neither cloud metadata endpoints nor the internet. The
 genuine outbound-fetch surface is SearXNG's image proxy, which fetches result-supplied
 URLs; upstream mitigates this by HMAC-signing proxied URLs so that only URLs SearXNG
-itself emitted can be requested. This is documented rather than papered over with SSRF
+itself emitted can be requested. This is documented instead of papered over with SSRF
 defences for requests we never make.
 
 ## 9. Privacy model (design level)
@@ -268,7 +268,7 @@ users — which is what makes the cache privacy-compatible in the first place. T
 cost: a shared cache is a timing side channel. Someone able to measure response latency
 can infer that *somebody* recently searched a given term. They learn nothing about who.
 The mitigation is a short TTL bounding the observation window, and the cache can be
-disabled by configuration. This trade-off is documented rather than hidden, and a
+disabled by configuration. This trade-off is documented, not hidden, and a
 millisecond latency win is not treated as automatically worth it.
 
 **Image proxying is enabled**, so result thumbnails are fetched by the server rather than

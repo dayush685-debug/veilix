@@ -4,14 +4,14 @@ This module imports nothing from FastAPI, httpx, redis, or any provider. It
 describes what a search *is* in Veilix terms, independent of the fact that
 SearXNG happens to answer it today.
 
-The concrete payoff: when the SearXNG JSON shape changes — and it does, the
-project renamed its datastore key between releases — the damage is contained
+The concrete payoff: when the SearXNG JSON shape changes, and it does, the
+project renamed its datastore key between releases, the damage is contained
 to `providers/searxng.py`, which is the one module allowed to know that shape.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum, StrEnum
 
@@ -71,7 +71,7 @@ class SearchQuery:
     """A normalised search request.
 
     Normalisation happens once, here, and the same object is used both to
-    build the upstream call and to derive the cache key — so a cache hit is
+    build the upstream call and to derive the cache key, so a cache hit is
     guaranteed to correspond to an identical upstream request. Deriving them
     separately is how caches quietly start returning the wrong results.
     """
@@ -89,7 +89,7 @@ class SearchQuery:
 
         Contains only query parameters. There is no identity component, which
         is exactly what makes the cache shareable between users and therefore
-        privacy-compatible — and also what creates the timing side channel
+        privacy-compatible, and also what creates the timing side channel
         documented in docs/privacy.md §7.
         """
         parts = [
@@ -158,7 +158,7 @@ class SearchResult:
 class EngineFailure:
     """An upstream engine that did not answer.
 
-    Surfaced to the client rather than hidden. A search returning results from
+    Surfaced to the client instead of hidden. A search returning results from
     four engines while three were CAPTCHA-blocked is a materially different
     answer from one where all seven responded, and the user is entitled to
     know which they received.
@@ -227,19 +227,3 @@ class EngineInfo:
     supports_time_range: bool = False
     supports_safesearch: bool = False
     timeout_s: float = 0.0
-
-
-@dataclass
-class ProviderHealth:
-    """Observed health of the search backend.
-
-    Populated from real query outcomes rather than synthetic probes: engine
-    health comes from `unresponsive_engines` on responses we already made
-    (ADR-0006). Engines nobody has queried recently are *unknown*, not healthy,
-    and the dashboard must say so rather than showing an unearned green tick.
-    """
-
-    reachable: bool
-    breaker_state: str
-    recent_failures: dict[str, str] = field(default_factory=dict)
-    engines_seen_ok: set[str] = field(default_factory=set)

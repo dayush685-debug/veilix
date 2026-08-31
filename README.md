@@ -153,7 +153,7 @@ Two behaviours that surprise clients, both deliberate:
 
 - **`count` is results on this page, not a web-scale total.** The upstream
   reports no total, so any big number would be invented.
-- **`degraded: true` is normal.** Check it rather than assuming `failures` is
+- **`degraded: true` is normal.** Check it instead of assuming `failures` is
   empty.
 
 Interactive docs at `/redoc`, schema at `/openapi.json`.
@@ -168,10 +168,10 @@ cd tests/e2e && npx playwright test      # 44, against the real stack
 ./scripts/security-scan.sh               # pip-audit, npm audit, Trivy
 ```
 
-The E2E suite deliberately runs against real containers. This project produced
+The E2E suite runs against real containers. This project produced
 the same class of bug six times — configuration that looks correct, passes
 review, passes unit tests, and does nothing — and every one was found by running
-the real thing rather than a mock. [docs/testing.md](docs/testing.md) explains
+the real thing, not a mock. [docs/testing.md](docs/testing.md) explains
 the strategy and what is deliberately *not* tested.
 
 ## Monitoring
@@ -230,7 +230,7 @@ This project does not claim to make anyone anonymous.
 [docs/privacy.md §9](docs/privacy.md) states exactly what the operator of the
 machine can still observe. Performance figures appear only when measured, with
 the hardware named. Two security findings remain open and are documented with
-their residual risk rather than closed quietly.
+their residual risk instead of closed quietly.
 
 ## Roadmap
 

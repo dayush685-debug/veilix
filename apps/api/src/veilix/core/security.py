@@ -2,17 +2,17 @@
 
 Two credential types with deliberately different treatment:
 
-**API keys** are 256-bit values *we* generate, so they have full entropy and
+API keys are 256-bit values *we* generate, so they have full entropy and
 are not guessable. They are verified with SHA-256 and a constant-time compare.
 
-**The admin password** is chosen by a human, so it has low entropy and is
+The admin password is chosen by a human, so it has low entropy and is
 vulnerable to offline cracking if the hash leaks. It uses Argon2id.
 
 Using Argon2 for API keys would be a mistake dressed as caution: it adds
 ~50 ms of deliberate CPU burn to *every* authenticated request, which is a
 denial-of-service amplifier an attacker triggers for free by sending garbage
 keys. Slow hashing defends low-entropy secrets against offline attack. A
-random 256-bit key has nothing to defend — there is no dictionary for it.
+random 256-bit key has nothing to defend, there is no dictionary for it.
 """
 
 from __future__ import annotations
@@ -100,7 +100,7 @@ def verify_password(password: str, stored_hash: str) -> bool:
     """Verify a password against an Argon2 hash.
 
     Returns False on any verification failure rather than propagating, so a
-    malformed hash in configuration behaves as "no access" rather than as a
+    malformed hash in configuration behaves as "no access" instead of as a
     500 that an attacker can use to probe configuration state.
     """
     if not stored_hash:
@@ -166,10 +166,10 @@ def client_ip_from_headers(
     This is a small function guarding a large mistake. ``X-Forwarded-For`` is
     an ordinary request header: any client can send one. If it is honoured
     unconditionally, an attacker sets a fresh value per request and every
-    rate-limit bucket becomes theirs to choose — the limiter still runs, still
+    rate-limit bucket becomes theirs to choose, the limiter still runs, still
     reports numbers, and no longer limits anything.
 
-    So the header is read **only** when the deployment states that it sits
+    So the header is read only when the deployment states that it sits
     behind a trusted proxy, and the *first* entry is taken, which is the
     original client as appended by our own proxy. Taking the last entry is a
     common inversion of this that trusts whatever the attacker appended.

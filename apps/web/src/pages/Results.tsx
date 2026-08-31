@@ -98,7 +98,7 @@ export function Results() {
 
       {data && (
         <div
-          // Dimmed rather than replaced while the next search loads: keeps the
+          // Dimmed instead of replaced while the next search loads: keeps the
           // page from flashing and preserves scroll position.
           className={[
             'transition-opacity',
@@ -165,7 +165,7 @@ function ResultMeta({ data }: { data: import('@/lib/api').SearchResponse }) {
  *
  * Shown rather than hidden because a result set assembled from three engines
  * while four were blocked is a materially different answer from one where all
- * seven responded — and the user is the one who should decide whether to
+ * seven responded, and the user is the one who should decide whether to
  * retry. Hiding it would make Veilix look more reliable than it is.
  */
 function DegradedNotice({

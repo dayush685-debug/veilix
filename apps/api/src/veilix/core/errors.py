@@ -2,10 +2,10 @@
 
 Two rules shape this module:
 
-1. **Errors are classified, not stringified.** Each class carries the HTTP
+1. Errors are classified, not stringified. Each class carries the HTTP
    status and problem type it maps to, so the API layer never re-derives a
    status code from a message.
-2. **No error may leak a search query.** Detail strings are written by us and
+2. No error may leak a search query. Detail strings are written by us and
    are safe to return and to log. Upstream exception text is captured for
    metrics as a category, never interpolated into a response.
 """
@@ -170,7 +170,7 @@ async def validation_error_handler(request: Request, exc: Exception) -> JSONResp
     """Render FastAPI validation failures as problem+json.
 
     Without this, 422s come back in FastAPI's own `{"detail": [...]}` shape
-    while every other error is RFC 9457 — so a client would need two error
+    while every other error is RFC 9457, so a client would need two error
     parsers for one API, and the one it needs is decided by which failure it
     happens to hit.
 

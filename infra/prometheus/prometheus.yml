@@ -1,7 +1,7 @@
 # Prometheus scrape configuration for Veilix.
 #
 # Pull-based on purpose. A push-based agent would need an outbound path from
-# the API container, which ADR-0004 deliberately does not have — and it would
+# the API container, which ADR-0004 deliberately does not have, and it would
 # ship telemetry off-box, which is exactly what this product refuses to do.
 # Prometheus reaches in over the internal network instead.
 

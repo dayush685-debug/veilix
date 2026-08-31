@@ -120,7 +120,7 @@ def app(
     """An app wired to fakes, bypassing lifespan.
 
     ``create_app`` is used so routing, middleware ordering, and exception
-    handlers are the real ones — the parts most likely to break. Only the
+    handlers are the real ones, the parts most likely to break. Only the
     dependencies that would need a network are substituted.
     """
     from veilix.main import create_app
@@ -139,7 +139,7 @@ def app(
 async def client(app: FastAPI) -> AsyncIterator[httpx.AsyncClient]:
     """HTTP client bound to the app in-process.
 
-    ASGITransport rather than a live server: no port binding, no startup race,
+    ASGITransport instead of a live server: no port binding, no startup race,
     and lifespan is skipped so the fakes above are not overwritten by real
     connections.
     """
@@ -149,7 +149,7 @@ async def client(app: FastAPI) -> AsyncIterator[httpx.AsyncClient]:
 
 
 # ---------------------------------------------------------------------------
-# Response fixtures — shaped from a real probe, not invented
+# Response fixtures, shaped from a real probe, not invented
 # ---------------------------------------------------------------------------
 
 

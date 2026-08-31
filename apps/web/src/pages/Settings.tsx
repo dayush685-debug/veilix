@@ -1,5 +1,6 @@
-import { usePrefs } from '@/hooks/usePrefs';
-import type { ThemePref } from '@/lib/prefs';
+import { Section } from "@/components/Section";
+import { usePrefs } from "@/hooks/usePrefs";
+import type { ThemePref } from "@/lib/prefs";
 
 export function Settings() {
   const { prefs, setPref, reset } = usePrefs();
@@ -15,85 +16,96 @@ export function Settings() {
       </p>
 
       <Section title="Appearance">
-        <Field label="Theme" hint="Follows your system setting unless you choose otherwise.">
-          <select
-            value={prefs.theme}
-            onChange={(event) => setPref('theme', event.target.value as ThemePref)}
-            className={selectClass}
+        <div className="space-y-5">
+          <Field
+            label="Theme"
+            hint="Follows your system setting unless you choose otherwise."
           >
-            <option value="system">Match system</option>
-            <option value="light">Light</option>
-            <option value="dark">Dark</option>
-          </select>
-        </Field>
+            <select
+              value={prefs.theme}
+              onChange={(event) =>
+                setPref("theme", event.target.value as ThemePref)
+              }
+              className={selectClass}
+            >
+              <option value="system">Match system</option>
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+            </select>
+          </Field>
+        </div>
       </Section>
 
       <Section title="Search">
-        <Field
-          label="Safe search"
-          hint="Applied to every search unless overridden by the filter on a results page."
-        >
-          <select
-            value={String(prefs.safesearch)}
-            onChange={(event) =>
-              setPref('safesearch', Number(event.target.value) as 0 | 1 | 2)
-            }
-            className={selectClass}
+        <div className="space-y-5">
+          <Field
+            label="Safe search"
+            hint="Applied to every search unless overridden by the filter on a results page."
           >
-            <option value="0">Off</option>
-            <option value="1">Moderate</option>
-            <option value="2">Strict</option>
-          </select>
-        </Field>
+            <select
+              value={String(prefs.safesearch)}
+              onChange={(event) =>
+                setPref("safesearch", Number(event.target.value) as 0 | 1 | 2)
+              }
+              className={selectClass}
+            >
+              <option value="0">Off</option>
+              <option value="1">Moderate</option>
+              <option value="2">Strict</option>
+            </select>
+          </Field>
 
-        <Field
-          label="Language"
-          hint="Restricting language narrows results and is sent to upstream engines."
-        >
-          <select
-            value={prefs.language}
-            onChange={(event) => setPref('language', event.target.value)}
-            className={selectClass}
+          <Field
+            label="Language"
+            hint="Restricting language narrows results and is sent to upstream engines."
           >
-            <option value="auto">Any language</option>
-            <option value="en">English</option>
-            <option value="de">German</option>
-            <option value="fr">French</option>
-            <option value="es">Spanish</option>
-            <option value="hi">Hindi</option>
-            <option value="ja">Japanese</option>
-          </select>
-        </Field>
+            <select
+              value={prefs.language}
+              onChange={(event) => setPref("language", event.target.value)}
+              className={selectClass}
+            >
+              <option value="auto">Any language</option>
+              <option value="en">English</option>
+              <option value="de">German</option>
+              <option value="fr">French</option>
+              <option value="es">Spanish</option>
+              <option value="hi">Hindi</option>
+              <option value="ja">Japanese</option>
+            </select>
+          </Field>
+        </div>
       </Section>
 
       <Section title="Results">
-        <Toggle
-          label="Open results in a new tab"
-          checked={prefs.openInNewTab}
-          onChange={(value) => setPref('openInNewTab', value)}
-        />
-        <Toggle
-          label="Show which engines found each result"
-          hint="Useful for judging how much agreement is behind a result."
-          checked={prefs.showProvenance}
-          onChange={(value) => setPref('showProvenance', value)}
-        />
-        <Toggle
-          label="Load thumbnails"
-          hint="Thumbnails are proxied through this instance, so image hosts never see your address. Turning them off makes pages lighter and sends fewer requests."
-          checked={prefs.showThumbnails}
-          onChange={(value) => setPref('showThumbnails', value)}
-        />
+        <div className="space-y-5">
+          <Toggle
+            label="Open results in a new tab"
+            checked={prefs.openInNewTab}
+            onChange={(value) => setPref("openInNewTab", value)}
+          />
+          <Toggle
+            label="Show which engines found each result"
+            hint="Useful for judging how much agreement is behind a result."
+            checked={prefs.showProvenance}
+            onChange={(value) => setPref("showProvenance", value)}
+          />
+          <Toggle
+            label="Load thumbnails"
+            hint="Thumbnails are proxied through this instance, so image hosts never see your address. Turning them off makes pages lighter and sends fewer requests."
+            checked={prefs.showThumbnails}
+            onChange={(value) => setPref("showThumbnails", value)}
+          />
+        </div>
       </Section>
 
       <Section title="Your data">
         <p className="text-sm text-[var(--text-secondary)]">
           Everything Veilix stores about you is on this page. There is nothing
           held server-side to export or erase, because nothing is collected —
-          see the{' '}
+          see the{" "}
           <a href="/privacy" className="text-[var(--accent)] hover:underline">
             privacy model
-          </a>{' '}
+          </a>{" "}
           for the complete inventory.
         </p>
         <button
@@ -109,18 +121,7 @@ export function Settings() {
 }
 
 const selectClass =
-  'rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-3 py-2 text-sm transition-colors hover:border-[var(--border-strong)]';
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="mt-8 border-t border-[var(--border-subtle)] pt-6">
-      <h2 className="text-sm font-medium uppercase tracking-wide text-[var(--text-muted)]">
-        {title}
-      </h2>
-      <div className="mt-4 space-y-5">{children}</div>
-    </section>
-  );
-}
+  "rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-3 py-2 text-sm transition-colors hover:border-[var(--border-strong)]";
 
 function Field({
   label,
@@ -136,7 +137,9 @@ function Field({
       <span className="flex-1">
         <span className="text-sm">{label}</span>
         {hint && (
-          <span className="mt-0.5 block text-xs text-[var(--text-muted)]">{hint}</span>
+          <span className="mt-0.5 block text-xs text-[var(--text-muted)]">
+            {hint}
+          </span>
         )}
       </span>
       {children}

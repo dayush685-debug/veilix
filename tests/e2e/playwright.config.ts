@@ -1,17 +1,14 @@
 import { defineConfig, devices } from '@playwright/test';
 
 /**
- * End-to-end tests run against the REAL stack.
+ * End-to-end tests against the real stack: no mocked API, no stubbed SearXNG.
  *
- * No mocked API, no stubbed SearXNG. These tests exercise the deployed
- * containers, which is the only way to catch the class of bug this project has
- * repeatedly produced: configuration that looks right, passes unit tests, and
- * does nothing — a header the proxy appends instead of replacing, an env var
- * the container never receives, an OTel extra missing from the image.
+ * That is the only way to catch the bugs this project kept producing, where
+ * configuration looks right, passes unit tests, and does nothing: a header the
+ * proxy appends instead of replacing, an env var the container never gets.
  *
- * The cost is that some assertions depend on upstream search engines, which
- * fail constantly by design. Tests are written to assert *the interface handles
- * whatever came back*, never that a particular result appeared.
+ * Upstream engines fail constantly, so assertions check that the interface
+ * handles whatever came back, never that a particular result appeared.
  */
 export default defineConfig({
   testDir: './specs',
@@ -48,7 +45,7 @@ export default defineConfig({
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
     // Mobile matters for a search product; the layout is mobile-first and
-    // this is what proves it rather than a media query that looks right.
+    // this is what proves it instead of a media query that looks right.
     { name: 'mobile', use: { ...devices['Pixel 7'] } },
   ],
 });

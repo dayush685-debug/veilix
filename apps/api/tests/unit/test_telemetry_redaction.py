@@ -5,7 +5,7 @@ request URL by default, so enabling tracing exported
 
     http.url = http://searxng:8080/search?q=<the user's query>&...
 
-to whatever trace backend was configured — search queries shipped off-box by a
+to whatever trace backend was configured, search queries shipped off-box by a
 feature someone turned on to debug latency. Found with a canary query against a
 live collector, not by reading the instrumentation source.
 

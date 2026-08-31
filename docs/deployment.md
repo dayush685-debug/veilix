@@ -67,8 +67,8 @@ curl -I http://search.example.com  # expect 308 to https
 
 ## 3. Configuration that will stop you starting
 
-Production validation is deliberately strict, and it fails **at startup, loudly,
-listing every problem at once** rather than one per restart:
+Production validation is strict, and it fails **at startup, loudly,
+listing every problem at once**, not one per restart:
 
 - `SEARXNG_SECRET` shorter than 32 characters, or upstream's `ultrasecretkey`
 - `VEILIX_RATELIMIT_SALT_SEED` shorter than 32 characters
@@ -194,7 +194,7 @@ docker exec veilix-prometheus wget -qO- http://127.0.0.1:9090/api/v1/targets
 
 **Expect degraded results, permanently.** Upstream engines rate-limit and
 CAPTCHA self-hosted instances. On a datacentre IP this is worse than on a
-residential one. The interface reports which engines failed rather than hiding
+residential one. The interface reports which engines failed instead of hiding
 it, and the `SearchBackendCircuitOpen` alert fires only when SearXNG itself is
 unwell — not when individual engines are blocked, which is the normal state.
 

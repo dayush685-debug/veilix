@@ -64,7 +64,7 @@ that this stays true.
 | `engines` | comma-separated names | none | Restrict to specific engines |
 
 **Unknown parameters are rejected with 422.** This is deliberate: a typo such as
-`safe_search=2` would otherwise be silently ignored, and the caller would
+`safe_search=2` would otherwise be ignored without complaint, and the caller would
 receive moderate filtering while believing they had asked for strict.
 
 ```bash
@@ -156,7 +156,7 @@ Send `X-Request-ID` (alphanumeric, ≥8 chars) to correlate your logs with ours,
 or one is generated. It is regenerated per request and is **not** a session
 identifier — two requests from the same client share nothing, which is what
 stops it becoming a tracking token by accident. Non-conforming values are
-replaced rather than echoed, since echoing client bytes into log lines invites
+replaced instead of echoed, since echoing client bytes into log lines invites
 log injection.
 
 ## Image results
@@ -173,7 +173,7 @@ in a response.
 
 URLs pointing at private, loopback, or link-local addresses are refused rather
 than signed (SF-003). The residual risk — a *hostname* that resolves internally
-— is documented in [`security-findings.md`](./security-findings.md) rather than
+— is documented in [`security-findings.md`](./security-findings.md) instead of
 claimed as solved.
 
 ## Stability

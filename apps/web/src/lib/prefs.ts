@@ -8,7 +8,7 @@
  * create.
  *
  * Every access is wrapped, because localStorage throws outright in some
- * privacy modes — and a user with storage disabled is precisely the audience
+ * privacy modes, and a user with storage disabled is precisely the audience
  * this product is for, so they must get a working site, not a crash.
  */
 

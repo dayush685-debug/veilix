@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from veilix.core.urls import is_known_scheme, is_safe_to_proxy, is_safe_web_url
+from veilix.core.urls import is_safe_to_proxy, is_safe_web_url
 
 
 class TestSafeWebUrl:
@@ -49,12 +49,6 @@ class TestSafeWebUrl:
 
     def test_rejects_absurdly_long_urls(self) -> None:
         assert is_safe_web_url("https://example.com/" + "a" * 4000) is False
-
-    def test_known_scheme_allows_magnet(self) -> None:
-        # Legitimate in the torrent category, but never renderable as an href
-        # or feedable to the image proxy.
-        assert is_known_scheme("magnet:?xt=urn:btih:abc") is True
-        assert is_safe_web_url("magnet:?xt=urn:btih:abc") is False
 
 
 class TestSafeToProxy:
@@ -125,17 +119,17 @@ class TestSafeToProxy:
         assert is_safe_to_proxy("https://cdn.jsdelivr.net/x.svg") is True
 
     def test_public_name_pointing_at_a_private_address_is_not_caught(self) -> None:
-        """The remaining limit, stated rather than implied.
+        """The remaining limit, stated, not implied.
 
         A public-looking name whose DNS record points somewhere private still
         passes. Resolving to check is impossible here: the API container has no
         external DNS by design (ADR-0004), so the same isolation that contains
         an attacker also prevents this function from looking the name up.
-        Closing it needs an egress policy on the fetching side — SF-003.
+        Closing it needs an egress policy on the fetching side. SF-003.
 
         This test exists so that anyone who later adds resolution finds a
         deliberate decision rather than assuming an oversight.
         """
-        # A real, routable-looking name — not one under a reserved TLD, which
+        # A real, routable-looking name, not one under a reserved TLD, which
         # the suffix list would catch for a different reason.
         assert is_safe_to_proxy("https://intranet.mycompany.com/secret.jpg") is True

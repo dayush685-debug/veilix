@@ -151,7 +151,7 @@ class TestClientIpExtraction:
         )
 
     def test_unknown_when_nothing_available(self) -> None:
-        # Shares one heavily-used bucket rather than bypassing the limiter
+        # Shares one heavily-used bucket instead of bypassing the limiter
         # through an error path.
         assert (
             client_ip_from_headers(forwarded_for=None, peer_ip=None, trust_proxy=True) == "unknown"

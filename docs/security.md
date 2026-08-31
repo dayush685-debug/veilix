@@ -40,7 +40,7 @@ SearXNG — which also sits on `egress` — can.
 
 ## 2. Authentication
 
-Two credential types, deliberately treated differently.
+Two credential types, treated differently.
 
 **API keys** are 256-bit random values we generate, so they carry full entropy
 and are not guessable. Verified with SHA-256 and a constant-time compare, with
@@ -123,7 +123,7 @@ denial-of-service tool.
 - Page capped at 10
 - Language matched against a pattern, not free text
 - **Unknown query parameters are rejected** (`extra="forbid"`), so a typo fails
-  loudly instead of being silently ignored
+  loudly instead of being ignored without complaint
 - Request bodies capped at the edge
 
 ## 5. Untrusted content from search results
@@ -152,7 +152,7 @@ The API fetches exactly one hardcoded internal URL. No endpoint accepts a
 user-supplied URL and fetches it, so the classic surface does not exist there.
 
 The real surface is the **image proxy**. The API signs image URLs with the
-shared SearXNG secret so thumbnails are fetched server-side rather than by the
+shared SearXNG secret so thumbnails are fetched server-side instead of by the
 user's browser — which is what stops every image host learning the viewer's IP.
 That signing makes the API an oracle for URLs appearing in results.
 
@@ -206,7 +206,7 @@ Headers applied to every response:
 
 `img-src 'self' data:` forbids every third-party image host outright. That is
 only possible *because* thumbnails are proxied — so if proxying ever broke, the
-CSP would visibly break the page rather than silently leak. The privacy
+CSP would visibly break the page rather than quietly leak. The privacy
 decision and the security control reinforce each other.
 
 `scripts/check-csp-hash.sh` fails CI when the inline theme snippet and its hash
@@ -249,7 +249,7 @@ Everything else in the register is fixed.
 
 ## 10. Reporting a vulnerability
 
-Open a private security advisory on the repository rather than a public issue.
+Open a private security advisory on the repository instead of a public issue.
 Please include the request ID from any error response — it maps to a
 server-side log line, and that log line contains no query text or client
 address, so it is safe to share.

@@ -6,9 +6,9 @@ readiness failures restart the process, then a brief Valkey outage becomes a
 restart loop across every replica at once, turning a degraded dependency into
 an outage.
 
-- **/live** — "is this process running?" Never touches a dependency.
-- **/ready** — "should traffic be routed here?" Checks dependencies.
-- **/health** — human-facing detail for operators.
+- /live, "is this process running?" Never touches a dependency.
+- /ready, "should traffic be routed here?" Checks dependencies.
+- /health, human-facing detail for operators.
 """
 
 from __future__ import annotations

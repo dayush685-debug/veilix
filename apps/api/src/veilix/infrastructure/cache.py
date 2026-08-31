@@ -42,15 +42,15 @@ class ResultCache(Protocol):
 def cache_key(fingerprint: str) -> str:
     """Hash a query fingerprint into an opaque cache key.
 
-    Hashed rather than stored in the clear for two reasons. It keeps keys a
-    fixed short length regardless of query length, and it means a casual
-    `KEYS *` against the datastore shows opaque digests instead of a readable
-    list of what people have been searching for. It is not a security control
-    — anyone who can guess a query can compute its digest and confirm it, and
-    docs/privacy.md §9 says so — but it removes the accidental disclosure.
+        Hashed instead of stored in the clear for two reasons. It keeps keys a
+        fixed short length regardless of query length, and it means a casual
+        `KEYS *` against the datastore shows opaque digests instead of a readable
+        list of what people have been searching for. It is not a security control
+    , anyone who can guess a query can compute its digest and confirm it, and
+        docs/privacy.md §9 says so, but it removes the accidental disclosure.
 
-    The schema version is part of the digest so that a change to the cached
-    payload shape cannot collide with entries written by an older build.
+        The schema version is part of the digest so that a change to the cached
+        payload shape cannot collide with entries written by an older build.
     """
     digest = hashlib.sha256(f"{_SCHEMA_VERSION}|{fingerprint}".encode()).hexdigest()
     return f"{_KEY_PREFIX}{digest[:32]}"
@@ -100,7 +100,7 @@ class ValkeyResultCache:
 class NullResultCache:
     """No-op cache used when caching is disabled.
 
-    A null object rather than an ``if self._cache is not None`` scattered
+    A null object instead of an ``if self._cache is not None`` scattered
     through the search service. It also makes "caching off" a configuration
     that is exercised by the same code path as caching on, instead of a
     branch that is never tested.

@@ -1,10 +1,10 @@
-# Veilix — production override.
+# Veilix, production override.
 #
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 #
 # The base file is already production-shaped: no published ports except the
 # edge, hardened containers, resource limits, restart policies. This override
-# adds only what differs on a real host — the standard ports that automatic TLS
+# adds only what differs on a real host, the standard ports that automatic TLS
 # requires, and stricter operational settings.
 
 services:
@@ -12,7 +12,7 @@ services:
     ports:
       # 80 and 443 are not optional for automatic certificates: the ACME HTTP-01
       # challenge is served on 80, and the redirect to HTTPS lives there too.
-      # Binding 0.0.0.0 here is correct and deliberate — this is the one service
+      # Binding 0.0.0.0 here is correct and deliberate, this is the one service
       # that is meant to be reachable from the internet.
       - "80:80"
       - "443:443"
@@ -20,7 +20,7 @@ services:
     environment:
       # MUST be a real hostname in production, not ":8080". Caddy requests a
       # certificate for whatever is set here, so a bare port means plain HTTP
-      # with no TLS at all — the failure would be silent and total.
+      # with no TLS at all, the failure would be silent and total.
       VEILIX_SITE_ADDRESS: "${VEILIX_SITE_ADDRESS:?set VEILIX_SITE_ADDRESS to your public hostname}"
       VEILIX_ACME_EMAIL: "${VEILIX_ACME_EMAIL:-}"
     healthcheck:

@@ -10,7 +10,7 @@ export function Layout() {
   const hotkeys = useMemo(
     () => ({
       // Focusing the search field rather than navigating home keeps the
-      // current results on screen while retyping — losing them would punish
+      // current results on screen while retyping, losing them would punish
       // the shortcut's most common use.
       //
       // But pages like /about and /privacy have no search box, and the footer

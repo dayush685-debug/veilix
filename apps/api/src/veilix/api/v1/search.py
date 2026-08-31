@@ -44,9 +44,9 @@ _ERROR_RESPONSES: dict[int | str, dict[str, object]] = {
 )
 async def search(
     service: SearchServiceDep,
-    # Query() rather than Depends(): with Depends, FastAPI extracts each field
+    # Query() instead of Depends(): with Depends, FastAPI extracts each field
     # individually and the model's `extra="forbid"` is never applied, so a
-    # typo like `safe_search=2` would be silently ignored and the caller would
+    # typo like `safe_search=2` would be ignored without complaint and the caller would
     # get moderate filtering while believing they asked for strict. As a query
     # parameter model, unknown parameters are rejected with a 422 that names
     # them.

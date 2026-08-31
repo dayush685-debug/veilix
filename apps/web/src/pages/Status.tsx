@@ -49,7 +49,7 @@ export function Status() {
         <h1 className="text-2xl font-semibold tracking-tight">Status</h1>
         <p className="mt-4 rounded-[var(--radius-card)] border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-4 text-sm">
           The status endpoint is not responding. That usually means this
-          instance is down rather than that the check is broken.
+          instance is down instead of that the check is broken.
         </p>
       </div>
     );
@@ -151,7 +151,7 @@ function Dot({ healthy, small = false }: { healthy: boolean; small?: boolean }) 
         small ? 'size-2' : 'size-2.5',
         healthy ? 'bg-[var(--accent)]' : 'bg-[var(--warn-text)]',
       ].join(' ')}
-      // Colour alone must not carry the meaning — that fails for colour-blind
+      // Colour alone must not carry the meaning, that fails for colour-blind
       // users and in high-contrast modes.
       role="img"
       aria-label={healthy ? 'Operational' : 'Degraded'}

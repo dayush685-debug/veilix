@@ -123,7 +123,7 @@ internet route and that SearXNG is unreachable through the edge — checked by
 *response body*, because the SPA fallback also answers 200 and status alone
 gives a false pass.
 
-## Coverage, and why 89% rather than higher
+## Coverage, and why 89% instead of higher
 
 The brief asks for meaningful coverage rather than chasing 100%, and the
 remaining 11% is where that principle bites. It is concentrated in three places:

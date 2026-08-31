@@ -2,18 +2,13 @@ import { usePrefs } from '@/hooks/usePrefs';
 import type { SearchResult } from '@/lib/api';
 
 /**
- * One search result.
+ * One search result. Every string here was authored by whoever ranked for the
+ * query, so two rules hold:
  *
- * **Every string here is authored by a third party** — whoever ranked for the
- * query chose the title, the snippet, and the URL (SF-005). Two rules follow,
- * and both are load-bearing:
- *
- * 1. All text renders as React children, which escapes it. There is no
- *    `dangerouslySetInnerHTML` anywhere in the result path, so a snippet
- *    containing markup renders as visible characters rather than as DOM.
- * 2. The API already dropped non-http(s) URLs, but `rel="noreferrer"` is
- *    applied regardless — it stops the destination learning that Veilix sent
- *    the visitor, which is a privacy property rather than a security one.
+ * 1. Text renders as React children, never `dangerouslySetInnerHTML`, so
+ *    markup in a snippet shows as characters instead of DOM.
+ * 2. `rel="noreferrer"` on every outbound link, so the destination does not
+ *    learn that Veilix sent the visitor.
  */
 export function ResultCard({ result }: { result: SearchResult }) {
   const { prefs } = usePrefs();

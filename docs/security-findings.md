@@ -33,7 +33,7 @@ Hardened further in the same pass: `read_only: true` with `/tmp` and
 both, so they are now memory-only and never reach disk.
 
 **A privacy question that had to be answered first**: those SQLite files might have
-contained query text, which would contradict `docs/privacy.md`. Checked rather than
+contained query text, which would contradict `docs/privacy.md`. Checked instead of
 assumed — a canary query was run and both databases were searched for its text. They hold
 engine metadata and tracker patterns, no queries. The tmpfs is belt-and-braces on top.
 
@@ -89,10 +89,10 @@ and timing still leak whether an internal host and port are live.
 `http`/`https` schemes, and any host that is a literal IP address in a private, loopback,
 link-local, reserved, multicast, or unspecified range is refused rather than signed. Unit
 tests cover the cloud metadata address, all three RFC 1918 ranges, IPv6 loopback, and IPv6
-link-local. A result carrying such an `img_src` now returns with no media rather than a
+link-local. A result carrying such an `img_src` now returns with no media instead of a
 signed URL.
 
-**The limit of that check, stated rather than implied.** It inspects the host as written.
+**The limit of that check, stated, not implied.** It inspects the host as written.
 The API container has no external DNS — the same isolation that contains an attacker
 (ADR-0004) also prevents this function from resolving a name — so a hostile *hostname*
 that resolves to an internal address still passes. Input validation alone does not address
@@ -191,7 +191,7 @@ Same root cause family as SF-002, different mechanism: that one was `setpriv` ne
 `CAP_SETUID` at runtime, this one is file capabilities checked at exec time.
 
 **Fix applied**: strip the capability from the binary at build time
-(`setcap -r /usr/bin/caddy`) rather than granting it back. Caddy listens on 8080 inside
+(`setcap -r /usr/bin/caddy`) instead of granting it back. Caddy listens on 8080 inside
 the container and Docker publishes the privileged port to it, so the capability was never
 needed — and removing it means this binary cannot bind a privileged port at all, even if
 something later tries.
@@ -243,7 +243,7 @@ carries only protocol, method, duration, size, and status.
 **Worth noting how this was found**: not by reading the configuration, which looked right,
 but by reading the output it produced. `scripts/verify-stack.sh` now greps recent access
 logs for anything shaped like an IP address, so a future field rename fails a check
-instead of silently reinstating the leak.
+instead of quietly reinstating the leak.
 
 
 ---
@@ -258,7 +258,7 @@ Fourteen HIGH/CRITICAL findings sit in Go modules statically linked into
 `usr/bin/caddy` — `golang.org/x/net`, `golang.org/x/text`, `google.golang.org/grpc`, and
 the Go standard library. They are not our dependencies and cannot be patched from here.
 
-**Verified rather than assumed**: pulled the newest published image (`caddy:2-alpine`,
+**Verified, not assumed**: pulled the newest published image (`caddy:2-alpine`,
 v2.11.4) and re-scanned. It is built against Go 1.26.3; every finding needs 1.26.4 or
 later. `apk --no-cache upgrade` in the Dockerfile fixed the Alpine packages — taking the
 count from 21 to 14 — but cannot touch a compiled binary.
@@ -287,7 +287,7 @@ Docker that is not enough: the embedded DNS server resolves service names, so
 The API would have signed them, and SearXNG — which has egress and sits on the same
 network — would have fetched them.
 
-Measured rather than theorised. Probing from inside `veilix-searxng`:
+Measured instead of theorised. Probing from inside `veilix-searxng`:
 
 ```
 REACHABLE  researchos-postgres, unrelated project (172.20.0.2:5432)
@@ -368,7 +368,7 @@ real base class now, defined inside the successful-import block so the SDK stays
 Two independent defects, both of which made a documented feature silently do nothing —
 the same class as the Phase 6 missing-environment-variables bug.
 
-**The SDK was not installed.** The Dockerfile ran `pip install .` rather than
+**The SDK was not installed.** The Dockerfile ran `pip install .` instead of
 `pip install ".[otel]"`, so `setup_tracing` hit its `ImportError` branch and returned
 `False`. An operator could set `VEILIX_OTLP_ENDPOINT`, restart, and get no traces and no
 explanation. The extra is now installed, and the import failure logs an error naming the
@@ -388,7 +388,7 @@ counting spans. One span arrived where six were expected.
 
 ## SF-013 — Caddy reported unhealthy forever in the production configuration
 
-- **Found**: Phase 9, by starting the production compose rather than reading it
+- **Found**: Phase 9, by starting the production compose not by reading it
 - **Severity**: Medium (availability)
 - **Status**: FIXED in Phase 9
 

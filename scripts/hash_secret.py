@@ -7,14 +7,14 @@
 
 Two credential types are treated differently on purpose:
 
-**API keys** are generated here with 256 bits of entropy, so they are not
+API keys are generated here with 256 bits of entropy, so they are not
 guessable and a fast SHA-256 digest is the correct way to store them. Slow
 hashing would add tens of milliseconds of CPU to every authenticated request
-for no security gain — there is no dictionary to defend a random 256-bit value
+for no security gain, there is no dictionary to defend a random 256-bit value
 against, and the cost becomes a denial-of-service lever an attacker pulls for
 free by sending garbage keys.
 
-**The admin password** is chosen by a human, so it has low entropy and is worth
+The admin password is chosen by a human, so it has low entropy and is worth
 cracking offline if the hash leaks. It gets Argon2id.
 
 Run from the repository root. Requires the API dependencies to be importable

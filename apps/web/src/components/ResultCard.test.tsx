@@ -62,7 +62,7 @@ describe('ResultCard', () => {
       expect(document.querySelector('img[onerror]')).toBeNull();
     });
 
-    it('escapes HTML in the snippet rather than rendering it', () => {
+    it('escapes HTML in the snippet instead of rendering it', () => {
       const hostile = '<script>alert(1)</script>injected';
       renderCard(makeResult({ snippet: hostile }));
 

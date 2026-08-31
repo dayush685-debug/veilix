@@ -1,6 +1,6 @@
 """Security controls, tested at the HTTP boundary.
 
-Each test corresponds to a control that would fail silently if broken — the
+Each test corresponds to a control that would fail silently if broken, the
 service would keep returning 200s while the protection did nothing. That is
 what makes them worth asserting rather than trusting.
 """
@@ -62,7 +62,7 @@ class TestRateLimiting:
         """Probes must answer while the limiter sheds load.
 
         Otherwise an orchestrator reads 429 as unhealthy and restarts a service
-        that is behaving exactly as designed under load — turning a traffic
+        that is behaving exactly as designed under load, turning a traffic
         spike into an outage.
         """
         respx.get(f"{SEARXNG_BASE}/search").mock(
@@ -131,7 +131,7 @@ class TestApiKeyAuthentication:
         self, app: object, client: httpx.AsyncClient, settings: Settings
     ) -> None:
         # An unrecognised key must not grant elevated limits. Search is public,
-        # so the request still succeeds — it just gets no privileges.
+        # so the request still succeeds, it just gets no privileges.
         app.state.settings = settings.model_copy(  # type: ignore[attr-defined]
             update={"api_key_hashes": hash_api_key(generate_api_key())}
         )

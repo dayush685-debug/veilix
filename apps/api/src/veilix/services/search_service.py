@@ -6,7 +6,7 @@ Composes the pieces in the order that matters:
 
 The ordering is a design decision, not an accident. The cache is consulted
 *before* the breaker so that a cached answer is still served while SearXNG is
-down — the breaker exists to stop hammering a struggling dependency, and a
+down, the breaker exists to stop hammering a struggling dependency, and a
 cache hit does not touch it at all. Reversing the two would turn a recoverable
 upstream outage into a total one for queries we could already answer.
 """
@@ -75,7 +75,7 @@ class SearchService:
             raise
 
         # Store before recording metrics so a serialisation bug surfaces as a
-        # cache write failure rather than as a skipped measurement.
+        # cache write failure instead of as a skipped measurement.
         await self._cache.set(fingerprint, _outcome_to_cache(outcome))
 
         self._record(query, outcome, started, cache="miss")
@@ -87,7 +87,7 @@ class SearchService:
         Suggestions are cheap, best-effort, and already fail soft in the
         provider. Routing them through the breaker would let a suggestion
         outage trip the circuit that protects *search*, which is the more
-        important operation — a noisy neighbour problem created by sharing a
+        important operation, a noisy neighbour problem created by sharing a
         breaker between a critical and a decorative call.
         """
         return await self._provider.suggest(text)
@@ -109,7 +109,7 @@ class SearchService:
         for engine in outcome.responding_engines:
             engine_results_total.labels(engine=engine).inc()
 
-        # Real failure data from real queries, rather than a synthetic health
+        # Real failure data from real queries, not a synthetic health
         # probe that would itself consume upstream quota (ADR-0006).
         for failure in outcome.failures:
             engine_failures_total.labels(

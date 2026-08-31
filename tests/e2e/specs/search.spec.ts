@@ -55,7 +55,7 @@ test.describe('searching', () => {
 
     // %20 rather than +: encodeURIComponent produces the former, and both are
     // valid in a query string. Matching the separator loosely keeps this test
-    // about navigation rather than about encoding style.
+    // about navigation instead of about encoding style.
     await expect(page).toHaveURL(/\/search\?q=open[+%20]{1,3}source[+%20]{1,3}search/);
 
     // Either results or a coherent empty state - both are correct outcomes on
@@ -139,7 +139,7 @@ test.describe('keyboard and accessibility', () => {
     await expect(searchBox(page)).toBeFocused();
   });
 
-  test('typing a slash inside the box types it rather than re-triggering', async ({
+  test('typing a slash inside the box types it instead of re-triggering', async ({
     page,
   }) => {
     // The classic shortcut bug that makes keyboard navigation feel hostile.

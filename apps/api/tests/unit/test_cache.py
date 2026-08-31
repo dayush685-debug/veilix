@@ -1,8 +1,8 @@
 """Cache behaviour and resilience.
 
-The governing property: **a cache is an optimisation, and losing it must
-degrade latency without degrading correctness or availability.** Every error
-path here exists so that a sick Valkey makes search slower rather than broken.
+The governing property: a cache is an optimisation, and losing it must
+degrade latency without degrading correctness or availability. Every error
+path here exists so that a sick Valkey makes search slower, not broken.
 
 The second property is privacy: the cache key must carry no identity, because
 that is what makes entries shareable between users and therefore compatible
@@ -168,7 +168,7 @@ class TestValkeyCacheResilience:
         Pickle would deserialise arbitrary objects from the cache, turning any
         write access to Valkey into code execution in the API process. The
         cache is shared, ephemeral, and reachable by anything on the backend
-        network — precisely where that matters.
+        network, precisely where that matters.
         """
         redis = FakeRedis()
         await ValkeyResultCache(redis, ttl_s=60).set("fp", {"results": []})
@@ -184,7 +184,7 @@ class TestNullCache:
         await NullResultCache().set("fp", {"results": []})
 
     async def test_satisfies_the_same_interface(self) -> None:
-        """A null object rather than `if cache is not None` scattered around.
+        """A null object instead of `if cache is not None` scattered around.
 
         It also means "caching disabled" exercises the same code path as
         caching enabled, instead of being a branch nothing ever tests.

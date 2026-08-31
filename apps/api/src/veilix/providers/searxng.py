@@ -47,7 +47,7 @@ log = get_logger(__name__)
 IMAGE_PROXY_PATH: Final = "/img"
 
 # Upstream template name to domain result kind. Upstream decides rendering by
-# template rather than category, which is the more accurate signal — an image
+# template rather than category, which is the more accurate signal, an image
 # can appear in a general search and should still render as an image.
 _TEMPLATE_KINDS: Final[dict[str, ResultKind]] = {
     "default.html": ResultKind.WEB,
@@ -62,7 +62,7 @@ _TEMPLATE_KINDS: Final[dict[str, ResultKind]] = {
 }
 
 # Upstream reports failures as free text ("Suspended: too many requests").
-# Free text is unusable as a metric label — it is unbounded cardinality — so
+# Free text is unusable as a metric label, it is unbounded cardinality, so
 # it is folded into a small fixed set of causes.
 _FAILURE_PATTERNS: Final[tuple[tuple[str, str], ...]] = (
     ("captcha", "captcha"),
@@ -114,7 +114,7 @@ class SearxngProvider:
 
         Without this, the JSON API hands the browser raw third-party URLs and
         every thumbnail leaks the user's IP to hosts they never chose. Setting
-        ``image_proxy: true`` upstream is not enough on its own — it rewrites
+        ``image_proxy: true`` upstream is not enough on its own, it rewrites
         only SearXNG's own HTML rendering, and a live probe measured 0 of 264
         JSON image results as proxied.
 
@@ -268,7 +268,7 @@ class SearxngProvider:
         """Parse an upstream duration, which arrives in inconsistent forms.
 
         Observed as ``"3:42"``, as a bare number of seconds, and as ``None``.
-        Anything unrecognised yields ``None`` rather than a guess.
+        Anything unrecognised yields ``None`` instead of a guess.
         """
         if value in (None, "", "None"):
             return None
@@ -321,7 +321,7 @@ class SearxngProvider:
 
         Never raises. A failing suggestion backend must not break the search
         box, and there is nothing useful a caller could do with the error
-        anyway — the correct behaviour is simply no suggestions.
+        anyway, the correct behaviour is simply no suggestions.
         """
         if not text.strip():
             return ()

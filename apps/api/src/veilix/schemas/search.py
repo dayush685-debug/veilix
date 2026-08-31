@@ -26,7 +26,7 @@ from veilix.domain.models import (
 )
 
 # Length cap on the query. Long queries are not useful to any upstream engine
-# and an uncapped string is a free amplification vector — the API would relay
+# and an uncapped string is a free amplification vector, the API would relay
 # arbitrary bytes to dozens of engines on request.
 MAX_QUERY_LENGTH = 512
 
@@ -166,7 +166,7 @@ class SearchTiming(BaseModel):
 class SearchResponse(BaseModel):
     """A search result set, including how well the search went.
 
-    **There is no ``total_results`` field.** A live probe measured SearXNG
+    There is no ``total_results`` field. A live probe measured SearXNG
     returning ``number_of_results: null`` for a general query, so any total
     here would be fabricated. ``count`` is the number of results on this page,
     which is the number we actually know.

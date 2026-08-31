@@ -1,11 +1,7 @@
 """Structured logging.
 
-The design constraint is unusual and worth stating: **this logger must not be
-able to log a search query**, even by accident, even in a stack trace.
-
-Discipline alone does not survive contact with a growing codebase, so the
-privacy rule is enforced by a processor that runs on every event and drops
-sensitive keys, rather than by asking developers to remember.
+This logger must not be able to record a search query, even in a stack trace.
+Enforced by a processor on every event, not by convention.
 """
 
 from __future__ import annotations
@@ -21,9 +17,8 @@ import structlog
 # while handling a request carries its ID without being passed around.
 request_id_ctx: ContextVar[str | None] = ContextVar("request_id", default=None)
 
-# Keys that must never reach a log sink. Anything matching is replaced rather
-# than silently dropped, so a redaction is visible in the output and a
-# developer who logs a query sees immediately that it did not go through.
+# Replaced rather than dropped, so a redaction is visible in the output and
+# whoever logged it can see it did not go through.
 _FORBIDDEN_KEYS = frozenset(
     {
         "q",
@@ -55,12 +50,10 @@ _REDACTED = "<redacted>"
 def _drop_sensitive(
     _logger: Any, _method: str, event_dict: structlog.types.EventDict
 ) -> structlog.types.EventDict:
-    """Remove privacy-sensitive keys from every event.
+    """Redact privacy-sensitive keys (docs/privacy.md §4).
 
-    This is the enforcement point for docs/privacy.md §4. It is deliberately
-    a denylist on key names rather than an allowlist, because an allowlist
-    would silently swallow useful new operational fields and push developers
-    towards stuffing detail into the free-text event message instead.
+    A denylist, not an allowlist: an allowlist would swallow new operational
+    fields and push detail into the free-text message instead.
     """
     for key in list(event_dict):
         if key.lower() in _FORBIDDEN_KEYS:
@@ -80,10 +73,8 @@ def _bind_request_id(
 def configure_logging(level: str = "info", *, json_output: bool = True) -> None:
     """Install the logging configuration process-wide.
 
-    ``json_output=False`` gives a human-readable console renderer for local
-    development. The redaction processor runs in both modes — a developer's
-    terminal is still a place a query should not appear, and it is the mode
-    where someone is most likely to be screen-sharing.
+    ``json_output=False`` selects a console renderer for local development.
+    Redaction runs in both modes; a terminal is where screen-sharing happens.
     """
     log_level = getattr(logging, level.upper(), logging.INFO)
 
@@ -113,7 +104,7 @@ def configure_logging(level: str = "info", *, json_output: bool = True) -> None:
     )
 
     # Route stdlib logging (uvicorn, httpx) through the same pipeline so the
-    # output is one consistent stream rather than two interleaved formats.
+    # output is one consistent stream instead of two interleaved formats.
     logging.basicConfig(
         format="%(message)s",
         stream=sys.stdout,

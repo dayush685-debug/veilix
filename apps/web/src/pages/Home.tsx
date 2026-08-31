@@ -39,7 +39,7 @@ export function Home() {
       </p>
 
       {/*
-        Four claims, each one checkable against the implementation rather than
+        Four claims, each one checkable against the implementation instead of
         marketing copy. Every card links to the page that substantiates it,
         including the limits.
       */}

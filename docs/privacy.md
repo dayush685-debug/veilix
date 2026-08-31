@@ -64,7 +64,7 @@ their activity yesterday. It can count you; it cannot remember you.
 
 ## 4. Logging discipline
 
-Logs are structured JSON, and the schema is deliberately narrow. Every log line may
+Logs are structured JSON, and the schema is narrow. Every log line may
 contain: timestamp, level, logger name, request ID, HTTP method, **route template**,
 status code, and duration.
 
@@ -150,7 +150,7 @@ category, language, time range, safe-search level, page. There is no identity co
 which is exactly what makes the cache shareable and therefore privacy-compatible: the
 cache cannot distinguish who stored an entry.
 
-The honest cost, stated rather than buried: **a shared cache is a timing side channel.**
+The honest cost, stated, not buried: **a shared cache is a timing side channel.**
 An attacker who can measure response latency can distinguish a cache hit from a miss, and
 thereby learn that *somebody* searched a given term within the TTL window. They learn
 nothing about who, when precisely, or how many people.
@@ -162,7 +162,7 @@ Mitigations and their limits:
   this channel.
 
 Eliminating the channel while keeping a shared cache is not possible in general. The
-trade-off is documented so an operator can make the choice knowingly, rather than
+trade-off is documented so an operator can make the choice knowingly, instead of
 discovering the property later.
 
 ## 8. Operational telemetry versus user surveillance
@@ -209,7 +209,7 @@ be false.**
 
 Not legal advice, but a statement of the technical position:
 
-- **Data minimisation** is achieved structurally rather than by policy — the system has no
+- **Data minimisation** is achieved structurally, not by policy — the system has no
   place to put personal data.
 - **Right to erasure** is trivially satisfied because there is nothing stored to erase.
   There is no user record to delete.

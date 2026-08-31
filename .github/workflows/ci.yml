@@ -95,7 +95,7 @@ jobs:
 
       - name: Install
         # `ci`, not `install`: installs exactly what the lockfile pins and
-        # fails rather than silently resolving a different tree.
+        # fails rather than quietly resolving a different tree.
         run: npm ci
 
       - name: Lint
@@ -135,7 +135,7 @@ jobs:
         # SearXNG runs with JSON output on and its own bot limiter off, which is
         # safe ONLY while it is unreachable (SF-004). Publishing it would create
         # an open, unauthenticated, abusable search API — so this fails the
-        # build rather than shipping.
+        # build instead of shipping.
         run: |
           export SEARXNG_SECRET=ci-placeholder-not-a-real-secret
           docker compose -f docker-compose.yml config --format json |
@@ -206,7 +206,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: API image runs as non-root
-        # Verified against the built image rather than trusted from the
+        # Verified against the built image, not trusted from the
         # Dockerfile, because a base-image change can silently reset USER.
         run: |
           uid=$(docker run --rm --entrypoint id veilix-api:ci -u)
@@ -236,7 +236,7 @@ jobs:
 
       - name: Tracing dependency is present
         # Setting VEILIX_OTLP_ENDPOINT without this does nothing at all — a
-        # documented configuration knob that silently lies (SF-012).
+        # documented configuration knob that lies (SF-012).
         run: |
           docker run --rm --entrypoint python veilix-api:ci -c 'import opentelemetry.sdk' \
             || { echo "FAIL: the otel extra is missing from the image"; exit 1; }
@@ -266,7 +266,7 @@ jobs:
     # Upstream search engines are reached from a GitHub runner here, and they
     # rate-limit datacentre IPs aggressively. The suite tolerates degraded
     # results by design, but a total upstream block would still fail it — so
-    # this job reports rather than gates. It is the one place where the
+    # this job reports instead of gates. It is the one place where the
     # honest choice is a warning, because the failure would not be ours.
     continue-on-error: true
 
