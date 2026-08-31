@@ -6,7 +6,7 @@ A privacy-first, self-hostable meta-search platform built around
 It aggregates results from many search engines without accounts, without cookies, without
 search history, and without building a profile of the person asking.
 
-> **Build status: Phase 8 of 10 complete.** The full stack runs as four containers that
+> **Build status: Phase 9 of 10 complete.** The full stack runs as four containers that
 > are all non-root, read-only-rootfs, `cap_drop: ALL`, and `no-new-privileges`. 178 tests
 > pass, `scripts/verify-stack.sh` asserts **38 claims**, and 287 tests run across five layers against the running stack,
 > `scripts/security-scan.sh` reports zero fixable HIGH/CRITICAL vulnerabilities, and
@@ -81,6 +81,7 @@ Full detail in **[docs/architecture.md](docs/architecture.md)**.
 | [docs/performance.md](docs/performance.md) | Measured latency, throughput, and failure behaviour |
 | [docs/observability.md](docs/observability.md) | Logs, metrics, tracing, dashboards, and three leaks that were caught |
 | [docs/testing.md](docs/testing.md) | Testing strategy, what is deliberately untested, and what E2E found |
+| [docs/deployment.md](docs/deployment.md) | Production deploy, backup and recovery, and the bug testing it found |
 | [docs/threat-model.md](docs/threat-model.md) | Actors, trust boundaries, controls, and residual risk |
 | [docs/security-findings.md](docs/security-findings.md) | Every security finding, open and fixed, with evidence |
 | [docs/adr/](docs/adr/) | Architecture decision records, including what was rejected and why |

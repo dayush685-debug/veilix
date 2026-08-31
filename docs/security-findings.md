@@ -382,3 +382,51 @@ missing. Setup moved into the app factory, before the app serves anything.
 
 **How both were caught**: by running a real OTel collector, sending a request, and
 counting spans. One span arrived where six were expected.
+
+
+---
+
+## SF-013 — Caddy reported unhealthy forever in the production configuration
+
+- **Found**: Phase 9, by starting the production compose rather than reading it
+- **Severity**: Medium (availability)
+- **Status**: FIXED in Phase 9
+
+The base healthcheck probes `http://127.0.0.1:8080/`, which is where Caddy listens when
+`VEILIX_SITE_ADDRESS` is a bare port. In production that variable is a hostname, so Caddy
+binds 80 and 443 instead and the check could never succeed.
+
+Consequences: `depends_on: service_healthy` blocks dependent services, and an orchestrator
+restarts an edge container that is serving traffic perfectly well. The site works; the
+platform believes it does not.
+
+**The obvious fix is also wrong**, which is the part worth recording. Changing the probe to
+`wget --spider http://127.0.0.1:80/` fails too: wget FOLLOWS the 308 redirect into HTTPS
+and then fails the TLS handshake, because the container does not trust Caddy's own internal
+CA — and behind a real hostname, `127.0.0.1` matches no SNI site at all. busybox `wget` has
+neither `--max-redirect` nor `--no-check-certificate`, so neither escape hatch exists.
+
+**Fix**: assert the redirect itself, which is exactly what a healthy auto-HTTPS Caddy
+produces and is provable without a trusted certificate:
+
+```
+wget -S --spider -T 5 http://127.0.0.1:80/ 2>&1 | grep -qE "HTTP/1\.[01] 30[18]"
+```
+
+Verified: all four containers healthy under `docker-compose.prod.yml`, with HTTPS
+answering 200, HTTP redirecting 308, and search returning results over TLS.
+
+---
+
+## SF-014 — Deployment documentation named flags that do not exist
+
+- **Found**: Phase 9, running the project's own instructions
+- **Severity**: Low
+- **Status**: FIXED in Phase 9
+
+`docs/deployment.md` told operators to run `python scripts/hash_secret.py --password`. The
+script's flag is `--admin-password`, and there is no `--password`, so the very first
+command a new operator runs would fail with a usage error.
+
+Trivial, and worth logging: documentation is only verified when someone executes it. The
+commands in that document have now each been run.

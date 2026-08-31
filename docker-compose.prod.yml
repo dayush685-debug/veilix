@@ -1,0 +1,103 @@
+# Veilix — production override.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# The base file is already production-shaped: no published ports except the
+# edge, hardened containers, resource limits, restart policies. This override
+# adds only what differs on a real host — the standard ports that automatic TLS
+# requires, and stricter operational settings.
+
+services:
+  caddy:
+    ports:
+      # 80 and 443 are not optional for automatic certificates: the ACME HTTP-01
+      # challenge is served on 80, and the redirect to HTTPS lives there too.
+      # Binding 0.0.0.0 here is correct and deliberate — this is the one service
+      # that is meant to be reachable from the internet.
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"   # HTTP/3
+    environment:
+      # MUST be a real hostname in production, not ":8080". Caddy requests a
+      # certificate for whatever is set here, so a bare port means plain HTTP
+      # with no TLS at all — the failure would be silent and total.
+      VEILIX_SITE_ADDRESS: "${VEILIX_SITE_ADDRESS:?set VEILIX_SITE_ADDRESS to your public hostname}"
+      VEILIX_ACME_EMAIL: "${VEILIX_ACME_EMAIL:-}"
+    healthcheck:
+      # MUST be overridden here. The base healthcheck probes 127.0.0.1:8080,
+      # which is where Caddy listens when VEILIX_SITE_ADDRESS is a bare port.
+      # With a real hostname it binds 80 and 443 instead, so the base check
+      # fails forever - the container reports unhealthy, `depends_on:
+      # service_healthy` blocks, and an orchestrator restarts an edge that is
+      # serving traffic correctly.
+      #
+      # Found by actually starting the production configuration rather than
+      # only validating that it parses.
+      #
+      # Asserts that port 80 answers with a redirect, which is exactly what a
+      # healthy auto-HTTPS Caddy does - and is provable without a trusted
+      # certificate.
+      #
+      # A plain `wget --spider` does not work: it FOLLOWS the 308 into HTTPS and
+      # then fails the handshake, because the container does not trust Caddy's
+      # own CA (and, behind a real hostname, 127.0.0.1 matches no SNI site).
+      # busybox wget has neither --max-redirect nor --no-check-certificate, so
+      # the redirect itself is the signal to check.
+      test:
+        - CMD-SHELL
+        - >-
+          wget -S --spider -T 5 http://127.0.0.1:80/ 2>&1
+          | grep -qE "HTTP/1\.[01] 30[18]"
+      interval: 15s
+      timeout: 6s
+      retries: 5
+      # Longer than local: a first boot may be waiting on ACME issuance.
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          # Raised from the local 128M: TLS handshakes and HTTP/3 need more
+          # headroom than a loopback dev instance.
+          memory: 256M
+
+  api:
+    environment:
+      # Production configuration is validated at startup and refuses to run with
+      # placeholder secrets, a missing admin hash, rate limiting off, or
+      # wildcard CORS. That validation only engages when this is "production".
+      VEILIX_ENV: production
+      VEILIX_LOG_LEVEL: "${VEILIX_LOG_LEVEL:-info}"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  searxng:
+    environment:
+      # Generated links (including image-proxy URLs) must carry the public
+      # origin, or proxied images 404 behind a real domain.
+      SEARXNG_BASE_URL: "${VEILIX_PUBLIC_URL:?set VEILIX_PUBLIC_URL to your public https URL}/"
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+
+  valkey:
+    command:
+      - valkey-server
+      # Persistence stays OFF in production, and this is a privacy decision
+      # before it is a performance one: cached result payloads and rate-limit
+      # keys exist in memory only, so seizing the host filesystem yields no
+      # search data because none was ever written.
+      - --save
+      - ""
+      - --appendonly
+      - "no"
+      - --maxmemory
+      - 384mb
+      - --maxmemory-policy
+      - allkeys-lru
+    deploy:
+      resources:
+        limits:
+          memory: 512M
