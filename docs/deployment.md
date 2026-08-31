@@ -34,7 +34,10 @@ python scripts/hash_secret.py --admin-password   # admin password hash
 python scripts/hash_secret.py --api-key          # an API key and its digest
 ```
 
-Set these in `.env`:
+Set these in `.env`, or in an optional `.env.secrets` beside it. Compose reads
+`.env.secrets` when it exists and ignores it when it does not, which lets
+credential material be rotated separately from ordinary configuration. Both are
+gitignored.
 
 ```dotenv
 VEILIX_ENV=production

@@ -155,8 +155,17 @@ services:
     env_file:
       - path: .env
         format: raw
+      # Optional overlay for credential material, so hashes can be kept apart
+      # from ordinary configuration and rotated without touching .env.
+      #
+      # required:false is load-bearing. Without it, compose refuses to start
+      # when the file is absent, and since it is gitignored that means the
+      # documented quick start fails on every machine except one that already
+      # has it. Caught by CI on a clean checkout, having worked locally
+      # throughout only because the file happened to exist here.
       - path: .env.secrets
         format: raw
+        required: false
     environment:
       # Compose-internal addressing only. These are topology rather than
       # operator configuration, and `environment:` overrides env_file, so a
