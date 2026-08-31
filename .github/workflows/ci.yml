@@ -120,20 +120,22 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Prepare a throwaway environment
-        # The api service declares `env_file: .env`, which compose requires to
-        # exist, and .env is gitignored. A fresh clone must copy the example
-        # first, exactly as the quick start says. Without this, every compose
-        # command passes locally and fails on a clean checkout.
+        # A fresh clone has no .env - it is gitignored - and the api service
+        # declares `env_file: .env`, so every compose command fails without it.
         #
-        # Contains only the example placeholders, never real secrets.
-        run: cp .env.example .env
+        # The placeholders go INTO the file rather than being exported per
+        # step. `compose config` interpolates every service, profiled ones
+        # included, so a step that exports only some of the required variables
+        # fails on the others. Filling the file once is what an operator does
+        # anyway, and it leaves nothing for a later step to forget.
+        #
+        # Placeholders only. Nothing here is a real secret.
+        run: |
+          cp .env.example .env
+          sed -i             -e "s|^SEARXNG_SECRET=.*|SEARXNG_SECRET=ci-placeholder-not-a-real-secret|"             -e "s|^VEILIX_RATELIMIT_SALT_SEED=.*|VEILIX_RATELIMIT_SALT_SEED=ci-placeholder-not-a-real-salt|"             -e "s|^GRAFANA_ADMIN_PASSWORD=.*|GRAFANA_ADMIN_PASSWORD=ci-placeholder|"             .env
 
       - name: Compose files are valid
         run: |
-          # Placeholder secrets: `config` only interpolates, it never connects
-          # to anything, so these prove the files parse without real values.
-          export SEARXNG_SECRET=ci-placeholder-not-a-real-secret
-          export GRAFANA_ADMIN_PASSWORD=ci-placeholder
           docker compose -f docker-compose.yml config --quiet
           docker compose -f docker-compose.yml -f docker-compose.dev.yml config --quiet
           docker compose -f docker-compose.yml --profile observability config --quiet
@@ -145,11 +147,13 @@ jobs:
         # an open, unauthenticated, abusable search API — so this fails the
         # build instead of shipping.
         run: |
-          export SEARXNG_SECRET=ci-placeholder-not-a-real-secret
-          docker compose -f docker-compose.yml config --format json |
+          # Written to a file first: piping straight into python turns a
+          # compose interpolation error into an opaque JSONDecodeError and
+          # hides the real cause.
+          docker compose -f docker-compose.yml config --format json > "${RUNNER_TEMP}/compose.json"
           python -c "
-          import json,sys
-          services = json.load(sys.stdin)['services']
+          import json,os,sys
+          services = json.load(open(os.environ['RUNNER_TEMP'] + '/compose.json'))['services']
           offenders = [n for n, s in services.items() if (s.get('ports') or []) and n != 'caddy']
           if offenders:
               sys.exit(f'FAIL: these services publish host ports: {offenders}')
