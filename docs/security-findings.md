@@ -268,6 +268,16 @@ newer Go toolchain. That trades a maintained upstream release for a build we own
 is a real ongoing cost and not currently justified for a proxy that terminates TLS and
 serves static files.
 
+**Update, 2026-09-01.** CI caught a fifteenth, CVE-2026-56854, rated CRITICAL: an
+authentication bypass in `golang.org/x/crypto/ssh` where source-address restrictions went
+unenforced for several auth callbacks. It is an SSH *server* flaw, and Caddy runs no SSH
+server, so the affected path is unreachable here; the package is linked in transitively.
+Confirmed unpatchable the same way as the rest, by pulling the newest base and rescanning.
+
+Worth recording because of how it surfaced: this appeared between a local scan and a CI
+run, on a codebase nobody had touched. It is the case the weekly scheduled scan exists
+for, and the reason each entry carries an expiry rather than sitting in the file forever.
+
 **Why this is dated rather than simply ignored**: Caddy is the only internet-facing
 container here. An exception without an expiry is a permanent blind spot, so
 `.trivyignore` carries `exp:2026-11-30` on every entry and Trivy will re-report them

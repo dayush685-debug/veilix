@@ -31,7 +31,7 @@ def build_env(example: str, values: dict[str, str]) -> str:
     out = example
     for name, value in values.items():
         out, count = re.subn(
-            rf"^{re.escape(name)}=.*$", f"{name}={value}", out, flags=re.M
+            rf"^{re.escape(name)}=.*$", f"{name}={value}", out, flags=re.MULTILINE
         )
         if count == 0:
             out += f"\n{name}={value}\n"
@@ -79,7 +79,7 @@ def main() -> int:
     )
     (ROOT / args.api_key_out).write_text(api_key, encoding="utf-8")
 
-    defined = len(re.findall(r"^[A-Z][A-Z0-9_]*=", example, re.M))
+    defined = len(re.findall(r"^[A-Z][A-Z0-9_]*=", example, re.MULTILINE))
     print(
         f"wrote .env from .env.example ({defined} settings, {len(values)} overridden)"
     )

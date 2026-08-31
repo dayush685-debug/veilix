@@ -227,7 +227,7 @@ Measured, before and after hardening:
 | Image | Before | After |
 |---|---|---|
 | `veilix-api` | 57 HIGH/CRITICAL | **16**, none with a published fix |
-| `veilix-web` | 21 HIGH/CRITICAL | **14**, all in the upstream Caddy binary |
+| `veilix-web` | 21 HIGH/CRITICAL | **15**, all in the upstream Caddy binary |
 
 The API reduction came from applying base-image updates and **deleting pip and
 setuptools from the runtime image** — both Python findings lived in packaging
@@ -243,7 +243,7 @@ because a base-image change can silently reset any of those.
 | ID | Summary | Status |
 |---|---|---|
 | SF-003 | A public hostname resolving to a private address still passes the proxy guard | Partially mitigated; needs an egress policy, which input validation cannot provide |
-| SF-009 | Go CVEs compiled into the upstream Caddy binary | Accepted, `.trivyignore`, expires 2026-11-30 |
+| SF-009 | 15 Go CVEs compiled into the upstream Caddy binary | Accepted, `.trivyignore`, each dated, expires 2026-11-30 |
 
 Everything else in the register is fixed.
 

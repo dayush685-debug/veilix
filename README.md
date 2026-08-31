@@ -197,7 +197,8 @@ through Grafana or an SSH tunnel. See
   literals and internal hostnames, but a public hostname whose DNS resolves to a
   private address still passes. The API has no external DNS, so it cannot check;
   closing this needs an egress policy on SearXNG.
-- **SF-009, accepted.** 14 Go CVEs are compiled into the upstream Caddy binary.
+- **SF-009, accepted.** 15 Go CVEs are compiled into the upstream Caddy binary,
+  one of them an SSH-server flaw in a code path Caddy never reaches.
   The newest release is built against a Go version that still carries them, so
   they cannot be patched from here. Recorded in `.trivyignore` with an expiry
   date.
