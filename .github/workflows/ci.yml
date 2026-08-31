@@ -119,11 +119,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Prepare a throwaway environment
+        # The api service declares `env_file: .env`, which compose requires to
+        # exist, and .env is gitignored. A fresh clone must copy the example
+        # first, exactly as the quick start says. Without this, every compose
+        # command passes locally and fails on a clean checkout.
+        #
+        # Contains only the example placeholders, never real secrets.
+        run: cp .env.example .env
+
       - name: Compose files are valid
         run: |
           # Placeholder secrets: `config` only interpolates, it never connects
-          # to anything, so these prove the files parse without needing real
-          # values.
+          # to anything, so these prove the files parse without real values.
           export SEARXNG_SECRET=ci-placeholder-not-a-real-secret
           export GRAFANA_ADMIN_PASSWORD=ci-placeholder
           docker compose -f docker-compose.yml config --quiet
