@@ -26,6 +26,11 @@ has only been designed.
 | **Designed** | Implemented and reasoned about, not measured under load |
 | **Not verified** | Built but not yet exercised in its target environment |
 
+GitHub Actions runs on every push: backend lint/types/tests, frontend
+lint/types/tests/build, configuration consistency, image build and vulnerability
+scan, and a live-stack job that starts the containers and runs the architecture
+assertions and end-to-end suite against them.
+
 ## Capabilities
 
 - Search across web, news, images, videos, code, science, music, maps and files
@@ -205,8 +210,11 @@ through Grafana or an SSH tunnel. See
 - No accessibility conformance claim. Semantics are correct by construction
   and asserted by tests, but no contrast measurement or screen-reader pass has
   been run.
-- **CI has not run on GitHub.** Every step was executed locally; the workflow
-  itself is *not verified*.
+- **CI covers less than the local suite.** GitHub Actions runs green, but it
+  executes 33 of the 38 architecture assertions (the five observability ones
+  skip, because that profile is not started) and the 44 chromium end-to-end
+  tests rather than all 88 across both viewport projects. The mobile project
+  runs locally only.
 
 ## Roadmap
 
