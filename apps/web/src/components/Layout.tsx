@@ -12,10 +12,19 @@ export function Layout() {
       // Focusing the search field rather than navigating home keeps the
       // current results on screen while retyping — losing them would punish
       // the shortcut's most common use.
+      //
+      // But pages like /about and /privacy have no search box, and the footer
+      // advertises this shortcut as working "from anywhere". Silently doing
+      // nothing there is worse than either behaviour, so fall back to the home
+      // page, which has one. Caught by an end-to-end test, not by review.
       '/': () => {
         const input = document.querySelector<HTMLInputElement>('input[type="search"]');
-        input?.focus();
-        input?.select();
+        if (input) {
+          input.focus();
+          input.select();
+        } else {
+          void navigate('/');
+        }
       },
       s: () => navigate('/settings'),
       g: () => navigate('/'),
