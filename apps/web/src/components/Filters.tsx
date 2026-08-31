@@ -53,7 +53,7 @@ export function Filters({
       <div
         role="tablist"
         aria-label="Result category"
-        className="-mb-px flex gap-1 overflow-x-auto"
+        className="-mb-px flex min-w-0 gap-1 overflow-x-auto"
       >
         {CATEGORIES.map((item) => {
           const selected = item.value === category;

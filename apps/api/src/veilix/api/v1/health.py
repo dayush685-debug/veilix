@@ -65,6 +65,7 @@ async def live() -> LivenessResponse:
 @router.get(
     "/ready",
     response_model=ReadinessResponse,
+    responses={503: {"model": ReadinessResponse, "description": "A required dependency is down."}},
     summary="Readiness probe",
     description=(
         "Reports whether this instance should receive traffic. The search backend "
@@ -115,7 +116,10 @@ async def health(request: Request, settings: SettingsDep, breaker: BreakerDep) -
         "(docs/privacy.md §8)."
     ),
     response_class=Response,
-    responses={200: {"content": {CONTENT_TYPE_LATEST: {}}}},
+    responses={
+        200: {"content": {CONTENT_TYPE_LATEST: {}}},
+        404: {"description": "Metrics are disabled by configuration."},
+    },
 )
 async def metrics(settings: SettingsDep) -> Response:
     if not settings.metrics_enabled:

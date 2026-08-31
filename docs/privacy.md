@@ -131,7 +131,7 @@ The Veilix API therefore performs the rewrite itself. SearXNG signs proxy URLs a
 a signed request returns the image bytes with `HTTP 200`, and a tampered signature is
 rejected with `HTTP 400`.
 
-**A residual risk this introduces, stated plainly.** The image proxy fetches whatever
+A residual risk this introduces, stated plainly. The image proxy fetches whatever
 signed URL it is given. A hostile page that manages to rank in results could carry an
 `img_src` pointing at an internal address, and our API would sign it. Upstream limits the
 damage — responses must have an `image/` content type and are capped at 5 MB, so
@@ -192,10 +192,10 @@ A privacy document that only lists strengths is marketing. The limits:
 - **An operator with root on the host** could attach a debugger, capture memory, enable
   packet capture on the internal network, or modify the code to log queries. No
   application-level design prevents this.
-- **The Valkey cache holds query hashes**, and for a suspected query, an attacker with
+- The Valkey cache holds query hashes, and for a suspected query, an attacker with
   cache access could confirm presence by computing the hash. It is not reversible, but it
   is checkable against a guess.
-- **Upstream engines and the network path** see what §5 describes.
+- Upstream engines and the network path see what §5 describes.
 
 What this system provides is a design that does not *retain* identifying data and does not
 *want* it. What it cannot provide is protection against the operator of the machine it

@@ -116,7 +116,7 @@ export function Admin() {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               autoComplete="username"
-              className="mt-1 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-[var(--radius-input)] border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-3 py-2 text-sm"
             />
           </label>
           <label className="block">
@@ -126,7 +126,7 @@ export function Admin() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="current-password"
-              className="mt-1 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-[var(--radius-input)] border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-3 py-2 text-sm"
             />
           </label>
 
@@ -139,7 +139,7 @@ export function Admin() {
           <button
             type="submit"
             disabled={!password || loading}
-            className="w-full rounded-full bg-[var(--accent)] px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-hover)] disabled:opacity-40"
+            className="w-full rounded-full bg-[var(--accent)] px-5 py-2 text-sm font-medium text-[var(--accent-contrast)] transition-colors hover:bg-[var(--accent-hover)] disabled:opacity-40"
           >
             {loading ? "Checking…" : "Sign in"}
           </button>

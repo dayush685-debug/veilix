@@ -12,7 +12,7 @@ In priority order, because the order changes what you build:
 1. **The link between a person and their queries.** This is the product. Losing
    it is worse than an outage, because an outage is recoverable and a disclosure
    is not.
-2. **The instance's ability to keep working.** A self-hosted meta-search
+2. The instance's ability to keep working. A self-hosted meta-search
    instance that gets abused into an upstream ban is dead even though nothing
    was breached.
 3. **The host it runs on.** Standard: no code execution, no lateral movement.
@@ -39,7 +39,7 @@ architectural property, not an oversight — see [ADR-0002](adr/0002-no-relation
   │   SearXNG    │  the only container with egress
   └──────┬───────┘
          │  ← boundary 4: upstream engines are untrusted
-   272 search engines — their responses are attacker-influenceable
+   82 enabled search engines - their responses are attacker-influenceable
 ```
 
 **Boundary 4 is the one most systems get wrong.** Search results arrive over a
@@ -76,7 +76,7 @@ Two independent things had to be right:
   *append*, and the API reads the first entry. `header_up X-Forwarded-For
   {remote_host}` overwrites it. Caddy warns this directive is "unnecessary";
   the warning is wrong and the Caddyfile records why (SF-007).
-- **The API trusts the header only in production**, where a proxy is known to be
+- The API trusts the header only in production, where a proxy is known to be
   in front. In development it uses the peer address.
 
 **Verified**: ten requests through the proxy, each with a different forged
@@ -148,7 +148,7 @@ attacker finds:
 - **`/tmp` mounted `noexec,nosuid`**, so nothing can be staged and run there.
 - **No package manager.** pip and setuptools are deleted from the runtime image,
   so `pip install` is not available.
-- **uid 10001, `cap_drop: ALL`, `no-new-privileges`.**
+- uid 10001, `cap_drop: ALL`, `no-new-privileges`.
 - **No database** holding user data to steal, because there is none.
 
 This turns a large class of "RCE means total loss" outcomes into "RCE is
@@ -188,7 +188,7 @@ application.
   ~50 ms of CPU to every authenticated request — a denial-of-service lever an
   attacker pulls for free by sending garbage keys.
 - **The admin password** *is* human-chosen and low-entropy, so it uses Argon2id.
-- **Username mismatch still runs the password verification**, so response timing
+- Username mismatch still runs the password verification, so response timing
   does not reveal which half was wrong.
 - Admin endpoints are rate-limited like everything else, so brute force is
   bounded.
@@ -272,7 +272,7 @@ Being explicit about these is part of an honest model.
   short TTL; the cache can be disabled entirely.
 - **Traffic analysis.** A network observer sees TLS record sizes and timing. No
   application-layer control addresses this; Tor does.
-- **Malicious upstream engine returning a huge or malformed response.** Bounded
+- Malicious upstream engine returning a huge or malformed response. Bounded
   by timeouts, upstream's 5 MB proxy cap, and strict typed parsing that drops
   unusable results.
 - **CSRF.** No cookies, no sessions, no state-changing endpoints for anonymous

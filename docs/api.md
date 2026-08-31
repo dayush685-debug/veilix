@@ -31,7 +31,7 @@ So a `200` may still report failed engines:
 
 Check `degraded`. Do not assume an empty `failures` array.
 
-**2. There is no total result count.**
+2. There is no total result count.
 
 A live probe measured the upstream returning `number_of_results: null`, so any
 web-scale total would be invented. `count` is the number of results on the page

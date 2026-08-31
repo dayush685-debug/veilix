@@ -29,7 +29,8 @@ environment variables only.
 
 ## Consequences
 
-**Positive.** We inherit 272 engine integrations, result merging and deduplication,
+**Positive.** We inherit 272 engine integrations, of which 82 are enabled here,
+plus result merging and deduplication,
 relevance scoring, and mature per-engine failure handling (`ban_time_on_fail`,
 `suspended_times`) that we would otherwise have to write and then keep writing. Upstream
 security fixes arrive by changing an image tag. The engineering effort goes into the

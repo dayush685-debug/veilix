@@ -16,8 +16,8 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml \
 Grafana's password comes from `GRAFANA_ADMIN_PASSWORD`, and compose refuses to
 start the profile without one.
 
-**Why opt-in.** Prometheus and Grafana together use ~233 MiB against ~265 MiB
-for the entire core stack — measured, not estimated. An instance serves search
+**Why opt-in.** Prometheus and Grafana together use roughly as much memory as
+the entire core stack, which idles at 187 MiB — measured, not estimated. An instance serves search
 perfectly well without them, so they should not be a precondition for running
 the product.
 
@@ -145,12 +145,12 @@ Panel choices worth noting:
 - **Latency and request rate are separate panels**, not one panel with two
   y-axes. Two measures of different scale on one plot invite false correlation,
   and the shared time axis already lets you compare them.
-- **Breaker state uses text value mappings** (`CLOSED` / `HALF-OPEN` / `OPEN`),
+- Breaker state uses text value mappings (`CLOSED` / `HALF-OPEN` / `OPEN`),
   so state is never carried by colour alone.
-- **Cache hit ratio shows "no lookups yet"** rather than 0% before any traffic.
+- Cache hit ratio shows "no lookups yet" rather than 0% before any traffic.
   Those mean different things, and rendering them identically sends someone off
   debugging a healthy cache.
-- **Engine health is a bar gauge, not a time series** — the question is a ranked
+- Engine health is a bar gauge, not a time series — the question is a ranked
   comparison right now, not a trend.
 
 ## The admin dashboard, and what it cannot do

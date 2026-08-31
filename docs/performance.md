@@ -20,7 +20,7 @@ Three caveats that matter more than any figure below:
 2. **Upstream latency is not ours.** Cold-search timings are dominated by how
    fast third-party search engines answer, which varies hour to hour and is
    outside our control.
-3. **These are not production capacity numbers**, and this document will not
+3. These are not production capacity numbers, and this document will not
    pretend otherwise. They characterise behaviour and prove the mechanisms
    work; sizing a real deployment needs a test on real deployment hardware.
 
@@ -156,7 +156,8 @@ conflating them turns a Valkey hiccup into a restart storm.
 - **Cache-Control split** — hashed assets `immutable, max-age=31536000`;
   `index.html` `no-cache`, so a deploy cannot pin clients to a stale bundle that
   references assets which no longer exist.
-- **Bundle** 88 kB gzipped, with the vendor chunk split so React and the router
+- **Bundle** 89 kB of JavaScript gzipped (95 kB with CSS and HTML), with the
+  vendor chunk split so React and the router
   stay cached across deploys.
 - **`loading` is derived**, not stored (`useSearch`), which makes the
   stuck-spinner state unrepresentable rather than merely unlikely.

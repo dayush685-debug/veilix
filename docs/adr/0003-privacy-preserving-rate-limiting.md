@@ -50,14 +50,14 @@ being able to remember them.
 
 **Negative and worth being precise about:**
 
-- **A forward-guess attack remains possible within the current day.** An attacker holding
+- A forward-guess attack remains possible within the current day. An attacker holding
   the current salt and a candidate IP can compute its key and check whether it exists.
   This requires compromising the running process's memory, at which point they can
   observe live queries anyway, so it does not meaningfully change the threat model.
 - **Rotation resets counters.** A client at its limit at the rotation boundary gets a
   fresh budget. The window is minutes and the boundary is daily, so the exploitable gain
   is one extra window per day. Accepted.
-- **In a multi-replica deployment the salt must be shared**, or replicas will compute
+- In a multi-replica deployment the salt must be shared, or replicas will compute
   different keys for the same client and each will enforce its own limit. Deriving the
   salt from a shared secret plus the current date is the intended fix; it is not needed
   at single-replica scale and is not implemented yet.

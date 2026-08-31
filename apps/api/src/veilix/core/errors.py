@@ -18,6 +18,7 @@ from fastapi import Request
 from fastapi.responses import JSONResponse
 
 PROBLEM_CONTENT_TYPE = "application/problem+json"
+HTTP_UNPROCESSABLE_ENTITY = 422
 _PROBLEM_BASE = "https://veilix.dev/problems"
 
 
@@ -157,6 +158,10 @@ async def veilix_error_handler(request: Request, exc: Exception) -> JSONResponse
     retry_after = getattr(exc, "retry_after", None)
     if retry_after is not None:
         headers["Retry-After"] = str(int(retry_after))
+    if exc.status_code == 401:
+        # RFC 7235 requires a challenge on 401. fetch() ignores it, so the
+        # in-app credential form is unaffected.
+        headers["WWW-Authenticate"] = 'Basic realm="veilix-admin", charset="UTF-8"'
 
     return JSONResponse(
         status_code=exc.status_code,
@@ -183,6 +188,10 @@ async def validation_error_handler(request: Request, exc: Exception) -> JSONResp
 
     problem = InvalidRequestError()
     body = problem.to_problem(_request_id(request))
+    # InvalidRequestError carries 400, but FastAPI answers validation failures
+    # with 422 and RFC 9457 requires the member to match the response code. A
+    # body claiming 400 inside a 422 makes a client trust one of the two.
+    body["status"] = HTTP_UNPROCESSABLE_ENTITY
 
     if isinstance(exc, RequestValidationError):
         body["errors"] = [
@@ -195,7 +204,7 @@ async def validation_error_handler(request: Request, exc: Exception) -> JSONResp
         ]
 
     return JSONResponse(
-        status_code=422,
+        status_code=HTTP_UNPROCESSABLE_ENTITY,
         content=body,
         media_type=PROBLEM_CONTENT_TYPE,
     )

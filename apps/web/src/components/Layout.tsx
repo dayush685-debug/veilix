@@ -48,10 +48,10 @@ export function Layout() {
       </a>
 
       <header className="border-b border-[var(--border-subtle)]">
-        <div className="mx-auto flex max-w-5xl items-center gap-6 px-4 py-3">
+        <div className="mx-auto flex max-w-5xl items-center gap-2 px-4 py-3 sm:gap-6">
           <NavLink
             to="/"
-            className="flex items-center gap-2 text-base font-semibold tracking-tight"
+            className="flex shrink-0 items-center gap-2 text-base font-semibold tracking-tight"
           >
             <span aria-hidden="true" className="text-[var(--accent)]">
               ◈
@@ -59,8 +59,8 @@ export function Layout() {
             Veilix
           </NavLink>
 
-          <nav aria-label="Main" className="flex-1">
-            <ul className="flex items-center gap-1 text-sm">
+          <nav aria-label="Main" className="min-w-0 flex-1 overflow-x-auto">
+            <ul className="flex w-max items-center gap-1 text-sm">
               <NavItem to="/privacy">Privacy</NavItem>
               <NavItem to="/status">Status</NavItem>
               <NavItem to="/about">About</NavItem>

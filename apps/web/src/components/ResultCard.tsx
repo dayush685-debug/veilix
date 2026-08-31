@@ -112,7 +112,7 @@ function ImageResult({ result }: { result: SearchResult }) {
 
 function Thumbnail({ src }: { src: string }) {
   return (
-    <div className="hidden size-20 shrink-0 overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] sm:block">
+    <div className="hidden size-20 shrink-0 overflow-hidden rounded-[var(--radius-card)] border border-[var(--border-subtle)] bg-[var(--surface-sunken)] sm:block">
       <img
         src={src}
         // Decorative here: the heading beside it already carries the meaning,

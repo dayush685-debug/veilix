@@ -31,7 +31,7 @@ The API sits on `edge` and `backend` only. Because `backend` is `internal: true`
 internet at all**. SearXNG is the only container with egress, because it is the only one
 that needs it.
 
-**SearXNG's limiter is set to `false`.** Rate limiting is enforced at the edge (Caddy)
+SearXNG's limiter is set to `false`. Rate limiting is enforced at the edge (Caddy)
 and in the API, where genuine client identity exists.
 
 ## Consequences
@@ -55,12 +55,12 @@ real client identity exists.
   mitigation is procedural and must be treated as such: publishing SearXNG and enabling
   the limiter must happen in the same commit. A Phase 5 test asserts SearXNG publishes no
   ports.
-- **The API cannot fetch anything at runtime**, by design. Any future feature needing
+- The API cannot fetch anything at runtime, by design. Any future feature needing
   outbound calls must either route through a service on `backend` or explicitly and
   visibly change this topology — which is the point: the change becomes a reviewable
   event rather than an accident.
 - **Debugging is slightly harder** — no `curl` from inside the API container to test
   external connectivity. Acceptable.
-- **Compose networking is not a security boundary against a container escape.** It
+- Compose networking is not a security boundary against a container escape. It
   constrains a compromised *process*, not a compromised *kernel*. Container hardening
   (Phase 5) addresses the other half, and neither substitutes for the other.

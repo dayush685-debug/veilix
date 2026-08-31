@@ -179,7 +179,7 @@ export function SearchBar({
         <button
           type="submit"
           className={[
-            'rounded-full bg-[var(--accent)] font-medium text-white transition-colors',
+            'rounded-full bg-[var(--accent)] font-medium text-[var(--accent-contrast)] transition-colors',
             'hover:bg-[var(--accent-hover)] disabled:opacity-40',
             large ? 'px-5 py-2 text-sm' : 'px-4 py-1.5 text-sm',
           ].join(' ')}

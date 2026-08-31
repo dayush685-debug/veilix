@@ -33,7 +33,7 @@ flowchart TB
     end
 
     subgraph egress["egress network"]
-        P["272 upstream engines<br/>Google · Bing · Wikipedia · arXiv · ..."]
+        P["82 enabled engines<br/>Google · Wikipedia · arXiv · Mojeek · ..."]
     end
 
     subgraph obs["observability profile (opt-in)"]
@@ -105,7 +105,7 @@ Each row states the decision, the reason, and what was rejected. Longer records 
 
 | Layer | Choice | Why | Rejected |
 |---|---|---|---|
-| Meta-search | **SearXNG** | Mature, AGPL, 272 engines, already solves result merging, scoring, and per-engine ban/suspend logic. Rewriting it would be the worst kind of not-invented-here. | Building a scraper fleet; YaCy (P2P, solves a different problem) |
+| Meta-search | **SearXNG** | Mature, AGPL, 272 engine integrations available, already solves result merging, scoring, and per-engine ban/suspend logic. Rewriting it would be the worst kind of not-invented-here. | Building a scraper fleet; YaCy (P2P, solves a different problem) |
 | Reverse proxy | **Caddy** | Automatic ACME TLS with essentially no configuration, HTTP/3, declarative Caddyfile, and it serves the SPA itself — which saves a whole nginx container on a RAM-constrained host. | Nginx (manual certbot lifecycle); Traefik (label-driven config is powerful but opaque for a fixed five-service topology) |
 | Backend | **Python 3.13 + FastAPI** | Async I/O suits a fan-out and aggregate workload; Pydantic gives request validation and OpenAPI generation from one set of type definitions. Same language as SearXNG, so one runtime to reason about. | Go (faster, but no schema-to-OpenAPI story this clean); Node (would add a third runtime) |
 | Frontend | **React + TypeScript + Vite** | Static SPA output ships as files inside the Caddy image, so there is no Node process in production. | Next.js — an SSR server would see every query in plaintext, which is a privacy regression, not just extra weight |
@@ -162,6 +162,15 @@ semantic-search or summarisation stage plugs in behind the same Protocol without
 or domain layers changing. That is the entirety of the "AI-ready" requirement — an
 interface, not speculative infrastructure.
 
+### Engines: 272 available, 82 enabled
+
+SearXNG ships 272 engine definitions. Veilix enables 82 of them, which is
+upstream's default set plus three independent indexes (mojeek, qwant, mwmbl)
+and minus four torrent engines. `infra/searxng/settings.yml` records why.
+
+Numbers elsewhere in this repository refer to the enabled set unless they say
+otherwise.
+
 ## 6. Verified SearXNG facts that drive the design
 
 Confirmed by running and probing the image. Several contradict popular guides.
@@ -174,12 +183,12 @@ Confirmed by running and probing the image. Several contradict popular guides.
    endpoint is trivially abusable, which is exactly why our SearXNG is never published (§8).
 4. **The container runs as root** and does not drop privileges; the entrypoint `chown`s
    config, then `exec`s Granian directly. Hardening is our responsibility — Phase 5.
-5. **`number_of_results` came back `null`** on a live general query. We therefore report
+5. `number_of_results` came back `null` on a live general query. We therefore report
    *results returned on this page* and never fabricate a web-scale total.
-6. **`/config` exposes 272 engines with real capability flags** (`paging`,
+6. `/config` exposes all 272 engine definitions with real capability flags (`paging`,
    `time_range_support`, `safesearch`, `languages`). The interface drives its filter
    affordances from this live data rather than a hardcoded list that would silently rot.
-7. **Image results carry third-party `img_src` URLs.** Rendering them directly would make
+7. Image results carry third-party `img_src` URLs. Rendering them directly would make
    the user's browser connect to `cdn.jsdelivr.net`, `gstatic.com` and similar, leaking IP
    and referrer to hosts the user never chose. SearXNG's `image_proxy` exists for this and
    will be enabled (§9).
@@ -202,13 +211,13 @@ What follows from that:
 
 - **Partial results are a first-class success**, not an error. Twenty usable results with
   three engines down is a 200, with the degradation reported in the envelope.
-- **Do not reimplement per-engine circuit breaking.** SearXNG already has
+- Do not reimplement per-engine circuit breaking. SearXNG already has
   `ban_time_on_fail`, `max_ban_time_on_fail`, and `suspended_times` (CAPTCHA to 3600s,
   Cloudflare CAPTCHA to 1296000s). Duplicating that in the orchestrator would be redundant
   machinery fighting the layer below it.
 - **One circuit breaker, at the right level**: around the *SearXNG dependency itself*,
   protecting the API from a wedged or overloaded instance.
-- **Provider health telemetry comes from `unresponsive_engines`** — real measured data,
+- Provider health telemetry comes from `unresponsive_engines` — real measured data,
  , not synthetic health checks.
 
 ## 8. Security model (design level)
@@ -262,7 +271,7 @@ truncated, with a TTL matching the limit window. The salt rotates daily and is n
 persisted, so yesterday's keys become permanently unlinkable to any address. The API can
 count you; it cannot remember you.
 
-**Cache privacy, with its trade-off stated.** The cache key is a hash of the *normalised
+Cache privacy, with its trade-off stated. The cache key is a hash of the *normalised
 query parameters only*, with no identity component, so entries are shared across all
 users — which is what makes the cache privacy-compatible in the first place. The honest
 cost: a shared cache is a timing side channel. Someone able to measure response latency
@@ -275,7 +284,7 @@ millisecond latency win is not treated as automatically worth it.
 by the user's browser. The cost is our bandwidth and CPU. The benefit is that third-party
 image hosts never see the user's IP.
 
-**What the operator can still technically observe.** Being straight about the limits:
+What the operator can still technically observe. Being straight about the limits:
 Caddy terminates TLS and therefore handles plaintext queries in memory; the API process
 sees every query; upstream engines see the query text and our server's IP. We reduce what
 is *retained* to near zero, but a self-hosted meta-search engine cannot make its own

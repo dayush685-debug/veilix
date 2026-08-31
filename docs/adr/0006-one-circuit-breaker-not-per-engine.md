@@ -40,11 +40,11 @@ would be guessing at state that upstream already tracks precisely.
 **Do not implement per-engine circuit breakers.** Rely on SearXNG's engine suspension,
 and tune its thresholds through configuration.
 
-**Implement exactly one circuit breaker**, around the **SearXNG dependency itself**. It
+Implement exactly one circuit breaker, around the **SearXNG dependency itself**. It
 opens when SearXNG as a whole is failing — connection refused, timeouts, 5xx — and
 protects the API from queueing requests against a wedged or overloaded instance.
 
-**Derive provider health from `unresponsive_engines`**, the per-engine failure list
+Derive provider health from `unresponsive_engines`, the per-engine failure list
 already present in every SearXNG JSON response. This is measured data from real queries,
 not a synthetic health check that would itself consume upstream quota.
 

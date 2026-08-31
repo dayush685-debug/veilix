@@ -18,7 +18,11 @@ router = APIRouter(tags=["search"])
 @router.get(
     "/engines",
     response_model=EnginesResponse,
-    responses={503: {"model": ProblemDetail, "description": "Backend unavailable."}},
+    responses={
+        422: {"model": ProblemDetail, "description": "Invalid parameters."},
+        429: {"model": ProblemDetail, "description": "Rate limit exceeded."},
+        503: {"model": ProblemDetail, "description": "Backend unavailable."},
+    },
     summary="List available search engines and their capabilities",
     description=(
         "Read from the live backend configuration, so the capability flags "

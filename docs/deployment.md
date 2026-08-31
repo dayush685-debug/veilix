@@ -8,7 +8,7 @@
 
 | Requirement | Why |
 |---|---|
-| A host with **2 GB RAM** | Measured: the core stack idles at ~265 MiB, peaks higher under load. 1 GB will not survive SearXNG's engine initialisation. |
+| A host with **2 GB RAM** | Measured: the core stack idles at 187 MiB and reached 414 MiB after sustained use. 1 GB will not survive SearXNG's engine initialisation. |
 | **20 GB disk** | Images are ~950 MB; the rest is headroom for logs and Prometheus. |
 | Docker Engine 24+ and Compose v2 | |
 | A **public DNS A/AAAA record** pointing at the host | Automatic certificates need it. |
@@ -175,7 +175,7 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml \
                --profile observability up -d
 ```
 
-Costs ~233 MiB, roughly as much as the entire core stack, which is why it is
+Costs roughly as much memory as the entire core stack, which is why it is
 opt-in. Neither Prometheus nor Grafana publishes a port in production. Reach
 Grafana over an SSH tunnel:
 
@@ -198,11 +198,11 @@ residential one. The interface reports which engines failed instead of hiding
 it, and the `SearchBackendCircuitOpen` alert fires only when SearXNG itself is
 unwell — not when individual engines are blocked, which is the normal state.
 
-**Rate limits default to 60/minute anonymous.** Raise
+Rate limits default to 60/minute anonymous. Raise
 `VEILIX_RATELIMIT_REQUESTS` only if you understand that a scraped instance gets
 banned upstream, and the instance dies without anything being breached.
 
-**Logs contain no query text and no IP addresses**, so ordinary debugging is
+Logs contain no query text and no IP addresses, so ordinary debugging is
 harder by design. The request ID in an error response is the bridge to the
 server-side log line.
 

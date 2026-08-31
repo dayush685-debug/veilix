@@ -39,7 +39,7 @@
   /* Amber — used only for "degraded", never decoratively. If this colour is
      on screen, something is genuinely partially broken. */
   --color-warn-400: oklch(78% 0.130 75);
-  --color-warn-600: oklch(58% 0.130 75);
+  --color-warn-600: oklch(52% 0.130 75);
 
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
                "Helvetica Neue", Arial, sans-serif;
@@ -48,7 +48,10 @@
   /* A modest scale. Search UI needs few sizes; more would add noise. */
   --text-2xs: 0.6875rem;
 
+  /* Cards and media surfaces. */
   --radius-card: 0.75rem;
+  /* Form controls, one step tighter so inputs read as interactive. */
+  --radius-input: 0.5rem;
 }
 
 /* ---------------------------------------------------------------------------
@@ -69,6 +72,10 @@
   --text-muted:     var(--color-ink-500);
   --accent:         var(--color-veil-700);
   --accent-hover:   var(--color-veil-600);
+  /* Foreground for text sitting on --accent. Light theme: a dark accent takes
+     white. Dark theme: a light accent needs dark ink, or contrast drops to
+     about 2:1. */
+  --accent-contrast: #ffffff;
   --focus-ring:     var(--color-veil-600);
   --warn-text:      var(--color-warn-600);
 }
@@ -84,6 +91,7 @@
   --text-muted:     var(--color-ink-400);
   --accent:         var(--color-veil-400);
   --accent-hover:   var(--color-veil-300);
+  --accent-contrast: var(--color-ink-950);
   --focus-ring:     var(--color-veil-400);
   --warn-text:      var(--color-warn-400);
 }
@@ -129,6 +137,19 @@
 
   ::selection {
     background-color: color-mix(in oklch, var(--accent) 25%, transparent);
+  }
+}
+
+@layer base {
+  /* Inline links inside running text carry an underline. Colour alone is not
+     a sufficient distinction, and against secondary text the accent measured
+     1.17:1 relative contrast. Nav items and buttons are excluded because they
+     are not inside a text block. */
+  p a[href]:not([class*="rounded"]),
+  li a[href]:not([class*="rounded"]),
+  dd a[href]:not([class*="rounded"]) {
+    text-decoration: underline;
+    text-underline-offset: 2px;
   }
 }
 

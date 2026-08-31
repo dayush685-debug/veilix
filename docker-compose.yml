@@ -284,6 +284,11 @@ services:
     profiles: ["observability"]
     restart: unless-stopped
     user: "472:472"
+    read_only: true
+    tmpfs:
+      # Grafana writes only to its data volume; /tmp covers plugin unpacking
+      # and session scratch.
+      - /tmp:rw,noexec,nosuid,size=32m
     depends_on:
       prometheus:
         condition: service_healthy

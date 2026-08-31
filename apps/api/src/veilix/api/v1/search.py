@@ -19,7 +19,7 @@ from veilix.schemas.search import (
 router = APIRouter(tags=["search"])
 
 _ERROR_RESPONSES: dict[int | str, dict[str, object]] = {
-    400: {"model": ProblemDetail, "description": "Invalid parameters."},
+    422: {"model": ProblemDetail, "description": "Invalid parameters."},
     429: {"model": ProblemDetail, "description": "Rate limit exceeded."},
     503: {"model": ProblemDetail, "description": "Search backend unavailable."},
     504: {"model": ProblemDetail, "description": "Search backend timed out."},
@@ -72,6 +72,10 @@ async def search(
 @router.get(
     "/search/suggestions",
     response_model=SuggestionsResponse,
+    responses={
+        422: {"model": ProblemDetail, "description": "Invalid parameters."},
+        429: {"model": ProblemDetail, "description": "Rate limit exceeded."},
+    },
     summary="Autocomplete suggestions for a partial query",
     description=(
         "Suggestions are fetched server-side, so the user's browser never contacts "

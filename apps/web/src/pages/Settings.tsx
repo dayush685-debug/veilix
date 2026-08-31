@@ -121,7 +121,7 @@ export function Settings() {
 }
 
 const selectClass =
-  "rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-3 py-2 text-sm transition-colors hover:border-[var(--border-strong)]";
+  "rounded-[var(--radius-input)] border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-3 py-2 text-sm transition-colors hover:border-[var(--border-strong)]";
 
 function Field({
   label,

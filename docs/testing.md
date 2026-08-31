@@ -1,7 +1,7 @@
 # Testing Strategy
 
-> **287 tests**: 226 backend, 17 frontend component, 44 end-to-end
-> (22 specs × chromium and mobile). Backend line coverage **89%**.
+330 tests: 225 backend, 17 frontend component, 88 end-to-end (44 specs run
+against chromium and a mobile viewport). Backend line coverage 89%.
 
 ## The principle
 
@@ -25,11 +25,11 @@ because integration boundaries are where this system actually breaks.
 
 | Layer | Count | Runs against | Catches |
 |---|---|---|---|
-| Unit | 181 | Pure functions, fakes | Logic, edge cases, security predicates |
+| Unit | 180 | Pure functions, fakes | Logic, edge cases, security predicates |
 | Integration | 27 | FastAPI + `respx` + `fakeredis` | Wiring, contracts, error mapping |
 | Security | 18 | The API surface | Auth, limits, validation, SSRF guards |
 | Component | 17 | jsdom | ARIA contracts, hostile-content escaping |
-| End-to-end | 44 | **The real running stack** | Everything the above cannot see |
+| End-to-end | 88 | **The real running stack** | Everything the above cannot see |
 | Verification | 38 | Live containers | Architectural claims (`verify-stack.sh`) |
 
 `scripts/verify-stack.sh` is not conventionally a test suite, and it is the most
@@ -105,6 +105,30 @@ invalid CSS selector, `check()` against a deliberately `sr-only` input, and a
 URL assertion expecting `+` where `encodeURIComponent` emits `%20`. Worth
 listing because "the test failed" and "the code is broken" are different
 findings, and conflating them erodes trust in the suite.
+
+## Accessibility tests
+
+`tests/e2e/specs/accessibility.spec.ts` runs axe-core against nine pages plus
+the dark theme, scoped to `wcag2a`, `wcag2aa` and `wcag21aa` so a failure maps
+to a numbered success criterion.
+
+What that establishes: no contrast failure, missing label, broken ARIA
+reference or heading-order problem that a tool can detect. What it does not:
+axe covers roughly a third of WCAG, all of it machine-checkable. Nothing here
+substitutes for using the site with a screen reader, and this repository makes
+no conformance claim.
+
+It found three real defects on its first run, all since fixed:
+
+| Defect | Measured | Fix |
+|---|---|---|
+| Amber "degraded" text on white | 4.36:1, below the 4.5:1 minimum | Darkened `--color-warn-600` |
+| Inline prose links | 1.17:1 against surrounding text, underlined only on hover | Always underlined inside `p`, `li`, `dd` |
+| Dark-theme primary button | white on light teal, 2.2:1 | Added `--accent-contrast`, dark ink in dark theme |
+
+The third is the one worth noting: the button was legible in light mode and
+close to unreadable in dark, which is exactly the kind of thing that survives
+review because nobody switches themes while reading a diff.
 
 ## Security tests
 
