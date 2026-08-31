@@ -19,17 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-THIRD-PARTY NOTICE
-
-Veilix orchestrates SearXNG (https://github.com/searxng/searxng), which is
-licensed AGPL-3.0-or-later. Veilix runs SearXNG as an unmodified upstream
-container image and communicates with it over its HTTP API. It does not link
-against, embed, or modify SearXNG source, so this project is not a derivative
-work of it and the AGPL's source-disclosure obligation does not extend to this
-code.
-
-Forking or patching SearXNG itself would change that analysis. This note is a
-statement of the project's structure, not legal advice.

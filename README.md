@@ -250,7 +250,6 @@ Report security issues through a private advisory, not a public issue.
 
 MIT, see [LICENSE](LICENSE).
 
-SearXNG is AGPL-3.0-or-later. Veilix runs it as an unmodified upstream container
-image and communicates over HTTP, without linking to or modifying its source.
-The LICENSE file records this; it describes how the projects are combined and is
-not legal advice.
+Third-party components are listed in [NOTICE](NOTICE), including SearXNG, which
+is AGPL-3.0-or-later. Veilix runs it as an unmodified upstream container image
+and talks to it over HTTP, without linking to or modifying its source.

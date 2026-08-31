@@ -1,0 +1,52 @@
+Veilix
+Copyright (c) 2026 Veilix contributors
+
+Veilix is licensed under the MIT License. See LICENSE.
+
+This file records third-party software that Veilix depends on but does not
+include, and is a description of how the projects are combined rather than
+legal advice.
+
+-------------------------------------------------------------------------------
+SearXNG
+-------------------------------------------------------------------------------
+
+    Project:  https://github.com/searxng/searxng
+    Licence:  AGPL-3.0-or-later
+    Used as:  an unmodified upstream container image
+              (searxng/searxng, pinned by digest in docker-compose.yml)
+
+Veilix performs no search of its own. It sends queries to a SearXNG instance
+over that instance's HTTP JSON API and presents the results.
+
+How the two are combined:
+
+  - SearXNG runs as a separate process in its own container.
+  - The only interface between them is HTTP over a private Docker network.
+  - No SearXNG source is copied, linked against, embedded, or modified. The
+    image is used exactly as published upstream.
+  - Configuration is supplied through a mounted settings.yml and environment
+    variables, both of which are supported upstream inputs.
+
+On this basis the Veilix source in this repository is distributed under the MIT
+License. Anyone redistributing the combined system, or forking or patching
+SearXNG itself, should evaluate their own obligations under the AGPL.
+
+The full text of the AGPL-3.0 as it applies to SearXNG is published with that
+project.
+
+-------------------------------------------------------------------------------
+Other components
+-------------------------------------------------------------------------------
+
+Veilix also runs the following as unmodified upstream container images, each
+under its own licence, none of which is redistributed by this repository:
+
+    Caddy      https://github.com/caddyserver/caddy        Apache-2.0
+    Valkey     https://github.com/valkey-io/valkey         BSD-3-Clause
+    Prometheus https://github.com/prometheus/prometheus    Apache-2.0
+    Grafana    https://github.com/grafana/grafana          AGPL-3.0-only
+
+Python and JavaScript dependencies are declared in apps/api/pyproject.toml,
+apps/web/package.json and tests/e2e/package.json, and are installed from their
+respective registries under their own licences.
